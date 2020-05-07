@@ -1,0 +1,93 @@
+
+**** I was getting errors while installing kivy 1.11.1 for python 3.8. I found following solution from "https://github.com/kivy/kivy/issues/6563"
+
+	pip install kivy[base] kivy_examples --pre --extra-index-url https://kivy.org/downloads/simple/
+
+
+1] Ensure you have the latest pip, wheel, and virtualenv:
+
+python -m pip install --upgrade pip wheel setuptools virtualenv
+
+2] Optionally create a new virtual environment for your Kivy project. Highly recommended:
+
+	First create the environment named kivy_venv in your current directory:
+
+	python -m virtualenv kivy_venv
+	
+	Activate the virtual environment. You’ll have to do this step from the current directory every time you start a new terminal. On windows CMD do:
+
+	kivy_venv\Scripts\activate
+
+	If you’re in a bash terminal, instead do:
+
+	source kivy_venv/Scripts/activate
+	
+	Your terminal should now preface the path with something like (kivy_venv), indicating that the kivy_venv environment is active. If it doesn’t say that, the virtual environment is not active.
+
+3] Install the dependencies (skip gstreamer (~120MB) if not needed, see Kivy’s dependencies). If you are upgrading Kivy, see Updating Kivy from a previous release:
+
+	python -m pip install docutils pygments pypiwin32 kivy_deps.sdl2==0.1.* kivy_deps.glew==0.1.*
+	python -m pip install kivy_deps.gstreamer==0.1.*
+
+	Note
+		If you encounter a MemoryError while installing, add after pip install the –no-cache-dir option.
+
+	For Python 3.5+, you can also use the angle backend instead of glew. This can be installed with:
+	python -m pip install kivy_deps.angle==0.1.*
+
+	Warning
+		When installing, pin kivy’s dependencies to the specific version that was released on pypi when your kivy version was released, like above. Otherwise you may get an incompatible dependency when it is updated in the future.
+
+4] Install kivy:
+	python -m pip install kivy==1.11.1
+
+5] (Optionally) Install the kivy examples:
+
+	python -m pip install kivy_examples==1.11.1
+	The examples are installed in the share directory under the root directory where python is installed.
+
+	That’s it. You should now be able to import kivy in python or run a basic example if you installed the kivy examples:
+
+	python kivy_venv\share\kivy-examples\demo\showcase\main.py
+
+============================MATPLOTLIB support via kivy garden legacy========================
+1] matplotlib is still in legacy format hence follow below instructions use matplotlib instead of graph
+	Garden is now distributed as a separate Python module, kivy-garden. You can install it with pip:
+
+	pip install kivy-garden
+
+	The garden module does not initially include any packages. You can download them with the garden tool installed by the pip package:
+
+	# Installing a garden package
+	garden install graph
+
+	# Upgrade a garden package
+	garden install --upgrade graph
+
+# Uninstall a garden package
+garden uninstall graph
+
+# List all the garden packages installed
+garden list
+
+# Search new packages
+garden search
+
+# Search all the packages that contain "graph"
+garden search graph
+
+# Show the help
+garden --help
+All the garden packages are installed by default in ~/.kivy/garden.
+
+Note
+
+In previous versions of Kivy, garden was a tool at kivy/tools/garden. This no longer exists, but the kivy-garden module provides exactly the same functionality.
+
+Packaging¶
+If you want to include garden packages in your application, you can add –app to the install command. This will create a libs/garden directory in your current directory which will be used by kivy.garden.
+
+For example:
+
+cd myapp
+garden install --app graph
