@@ -8,6 +8,8 @@ from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.uix.scrollview import ScrollView
+from kivy.base import EventLoop
+
 import os.path as ospath
 import socket_client_text, socket_client_video
 import sys
@@ -19,6 +21,8 @@ class ConnectPage(GridLayout):
         super().__init__(**kwargs)
         self.cols = 2
         self.videofeed = None
+        self.isvideo = False
+
         if(ospath.isfile('prev_details.txt')):
             with open('prev_details.txt', 'r') as f:
                 d = f.read().split(',')
@@ -49,11 +53,23 @@ class ConnectPage(GridLayout):
         self.add_widget(Label(text='Username:'))
         self.username = TextInput(text=prev_username, multiline=False)
         self.add_widget(self.username)
+        #self.username.bind(text=self.on_username_changed)
+        #self.username.bind(on_text_validate = self.on_username_changed)
+        #self.username.bind(focus = self.on_username_changed)
 
         self.add_widget(Label(text=''))
         self.join = Button(text='Join')
         self.join.bind(on_press=self.join_button)
         self.add_widget(self.join)
+
+    #def on_set_app_title(self, _=None):
+    #    chatapp.title = 'Indie Chat-' + self.username.text
+    
+    """def on_username_changed(self, instance, text):
+        chatapp.title = 'Indie Chat-' + instance.text    
+        EventLoop.window.title = chatapp.title
+
+        #Clock.schedule_once(self.on_set_app_title, 0.01)"""
 
     def join_button(self, instance):
         port_text = self.port_text.text
@@ -82,9 +98,15 @@ class ConnectPage(GridLayout):
         if not socket_client_text.connect(ip, port_text, username, show_error):
             return
 
+        #if video is not availale continue with text only
         if not socket_client_video.connect(ip, port_video, username, show_error):
-            return
+            self.isvideo = False
+            info = f"Can not connect to video device"
+            chatapp.info_page.update_info(info)
+        else:
+            self.isvideo = True
 
+        
         chatapp.create_chat_page()
         chatapp.screen_manager.current = 'Chat'
 
@@ -158,7 +180,10 @@ class ChatPage(GridLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.cols = 1
-        self.rows = 2
+        self.rows = 3
+
+        self.title = Label(text='Welcome: ' + chatapp.connect_page.username.text)
+        self.add_widget(self.title)
 
         # First row is going to be occupied by our scrollable label
         # We want it be take 90% of app height
@@ -171,12 +196,16 @@ class ChatPage(GridLayout):
         self.new_message = TextInput(width=Window.size[0]*0.8, size_hint_x=None, multiline=False)
         self.send = Button(text='Send')
         self.send.bind(on_press=self.send_message)
+        self.close = Button(text='Close App')
+        self.close.bind(on_press=self.close_app)
 
         # To be able to add 2 widgets into a layout with just one collumn, we use additional layout,
         # add widgets there, then add this layout to main layout as second row
-        bottom_line = GridLayout(cols=2)
+        #bottom_line = GridLayout(cols=2)
+        bottom_line = GridLayout(cols=3)
         bottom_line.add_widget(self.new_message)
         bottom_line.add_widget(self.send)
+        bottom_line.add_widget(self.close)
         self.add_widget(bottom_line)
 
         Window.bind(on_key_down=self.on_key_down)
@@ -184,10 +213,11 @@ class ChatPage(GridLayout):
 
         socket_client_text.start_listening(self.incoming_message, show_error)
 
-        socket_client_video.start_listening(self.incoming_message, show_error)
-        
-        socket_client_video.start_sending_video(self.show_video, show_error)
-        #Clock.schedule_interval(self.send_video, 1.0/33.0)
+        if(chatapp.connect_page.isvideo):
+            socket_client_video.start_listening(self.incoming_message, show_error)
+            
+            socket_client_video.start_sending_video(self.show_video, show_error)
+            #Clock.schedule_interval(self.send_video, 1.0/33.0)
 
         self.bind(size=self.adjust_fields)
 
@@ -239,7 +269,13 @@ class ChatPage(GridLayout):
     def incoming_message(self, username, message):
         self.history.update_chat_history(f'[color=20dd20]{username}[/color] > {message}')
 
+    def close_app(self, _):
+        #socket_client_text.client_socket_text.close()
+        #socket_client_video.client_socket_video.close()
+        App.get_running_app().stop()
+
 class EpicApp(App):
+    title = 'Indie Chat'
     def build(self):
         self.screen_manager = ScreenManager()
 
@@ -267,12 +303,17 @@ class EpicApp(App):
 # Error callback function, used by sockets client
 # Updates info page with an error message, shows message and schedules exit in 10 seconds
 # time.sleep() won't work here - will block Kivy and page with error message won't show up
-def show_error(message):
+def show_error(message = '', exit_flag = True):
     chatapp.info_page.update_info(message)
     chatapp.screen_manager.current = 'Info'
-    Clock.schedule_once(sys.exit, 10)
+    if(exit_flag):
+        Clock.schedule_once(sys.exit, 10)
+    else:
+        chatapp.screen_manager.current = 'Chat'
+
 
 
 if __name__ == "__main__":
     chatapp = EpicApp()
     chatapp.run()
+  
