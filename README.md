@@ -3,6 +3,7 @@ Video and Text chat app
 # Prerequisites
   - Python 3.8.2 for windows along with pip, venv, setuptools, wheel, virtualenv
   - Kivy for 3.8.2 (follow the kivy installation instructions)
+  - Numpy
   - OpenCV
   - I also use python python image library (PIL). This is part of standard python installation
   - Good to have - Visual Code with python extension. This will allow you to debug in case of problem as I have not yet included any log
@@ -26,6 +27,7 @@ Video and Text chat app
       Follow the Installing with get-pip.py instructions.
       To install behind proxy - 
         python get-pip.py --proxy="http://[user:passwd@]proxy.server:port"
+# Install Numpy
 # Install kivy
   1. First install dependencies
       python -m pip install docutils pygments pypiwin32 kivy_deps.sdl2==0.1.* kivy_deps.glew==0.1.*
