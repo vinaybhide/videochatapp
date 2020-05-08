@@ -9,6 +9,7 @@ from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.uix.scrollview import ScrollView
 from kivy.base import EventLoop
+import cv2
 
 import os.path as ospath
 import socket_client_text, socket_client_video
@@ -272,6 +273,7 @@ class ChatPage(GridLayout):
     def close_app(self, _):
         #socket_client_text.client_socket_text.close()
         #socket_client_video.client_socket_video.close()
+        cv2.destroyAllWindows()
         App.get_running_app().stop()
 
 class EpicApp(App):

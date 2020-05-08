@@ -3,8 +3,11 @@ import select
 
 HEADER_LENGTH = 10
 
-IP = "127.0.0.1"
-PORT = 1234
+#IP = "127.0.0.1"
+IP = input(f'IP: ')
+
+#PORT = 1234
+PORT = int(input(f'PORT: '))
 
 # Create a socket
 # socket.AF_INET - address family, IPv4, some otehr possible are AF_INET6, AF_BLUETOOTH, AF_UNIX
