@@ -22,7 +22,7 @@ class ConnectPage(GridLayout):
         super().__init__(**kwargs)
         self.cols = 2
         self.videofeed = None
-        self.isvideo = False
+        self.is_self_video_avlbl = True
 
         if(ospath.isfile('prev_details.txt')):
             with open('prev_details.txt', 'r') as f:
@@ -101,11 +101,12 @@ class ConnectPage(GridLayout):
 
         #if video is not availale continue with text only
         if not socket_client_video.connect(ip, port_video, username, show_error):
-            self.isvideo = False
-            info = f"Can not connect to video device"
-            chatapp.info_page.update_info(info)
+            self.is_self_video_avlbl = False
+            print('socket_client_video.connect returned False')
+            #info = f"Can not connect to video device"
+            #chatapp.info_page.update_info(info)
         else:
-            self.isvideo = True
+            self.is_self_video_avlbl = True
 
         
         chatapp.create_chat_page()
@@ -195,17 +196,22 @@ class ChatPage(GridLayout):
         # Input field should take 80% of window width
         # We also want to bind button click to send_message method
         self.new_message = TextInput(width=Window.size[0]*0.8, size_hint_x=None, multiline=False)
-        self.send = Button(text='Send')
+        self.send = Button(text='Send Text')
         self.send.bind(on_press=self.send_message)
+        self.start_video = Button(text='Start Video')
+        self.start_video.bind(on_press=self.start_video_send)
+        if not (chatapp.connect_page.is_self_video_avlbl):
+            self.start_video.set_disabled(True)
         self.close = Button(text='Close App')
         self.close.bind(on_press=self.close_app)
 
         # To be able to add 2 widgets into a layout with just one collumn, we use additional layout,
         # add widgets there, then add this layout to main layout as second row
         #bottom_line = GridLayout(cols=2)
-        bottom_line = GridLayout(cols=3)
+        bottom_line = GridLayout(cols=4)
         bottom_line.add_widget(self.new_message)
         bottom_line.add_widget(self.send)
+        bottom_line.add_widget(self.start_video)
         bottom_line.add_widget(self.close)
         self.add_widget(bottom_line)
 
@@ -214,11 +220,16 @@ class ChatPage(GridLayout):
 
         socket_client_text.start_listening(self.incoming_message, show_error)
 
-        if(chatapp.connect_page.isvideo):
-            socket_client_video.start_listening(self.incoming_message, show_error)
-            
+        """if(chatapp.connect_page.is_self_video_avlbl):
+            print('before socket_client_video.start_sending_video')
             socket_client_video.start_sending_video(self.show_video, show_error)
-            #Clock.schedule_interval(self.send_video, 1.0/33.0)
+            print('after socket_client_video.start_sending_video')"""
+
+        #Even if self camera is not available, one should be able to see other people's video's
+        print('before socket_client_video.start_listening')
+        socket_client_video.start_listening(self.incoming_message, show_error)
+        print('after socket_client_video.start_listening')
+        #Clock.schedule_interval(self.send_video, 1.0/33.0)
 
         self.bind(size=self.adjust_fields)
 
@@ -236,16 +247,25 @@ class ChatPage(GridLayout):
         self.history.height = new_height
 
         # New message input width - 80%, but at least 160px for send button
-        if Window.size[0] * 0.2 < 160:
-            new_width = Window.size[0] - 160
+        #if Window.size[0] * 0.2 < 160:
+        if Window.size[0] * 0.4 < 320:
+            #new_width = Window.size[0] - 160
+            new_width = Window.size[0] - 320
         else:
-            new_width = Window.size[0] * 0.8
+            #new_width = Window.size[0] * 0.8
+            new_width = Window.size[0] * 0.6
         self.new_message.width = new_width
 
         # Update chat history layout
         #self.history.update_chat_history_layout()
         Clock.schedule_once(self.history.update_chat_history_layout, 0.01)
-        
+    
+    def start_video_send(self, _):
+        if(chatapp.connect_page.is_self_video_avlbl):
+            print('before socket_client_video.start_sending_video')
+            socket_client_video.start_sending_video(self.show_video, show_error)
+            print('after socket_client_video.start_sending_video')
+
     # Gets called when either Send button or Enter key is being pressed
     # (kivy passes button object here as well, but we don;t care about it)
     def send_message(self, _):
@@ -271,10 +291,14 @@ class ChatPage(GridLayout):
         self.history.update_chat_history(f'[color=20dd20]{username}[/color] > {message}')
 
     def close_app(self, _):
-        #socket_client_text.client_socket_text.close()
-        #socket_client_video.client_socket_video.close()
+        show_error('Exiting App', True)
+        socket_client_text.client_socket_text.close()
+        socket_client_video.client_socket_video.close()
+        cv2.waitKey(1)
         cv2.destroyAllWindows()
-        App.get_running_app().stop()
+
+        #App.get_running_app().stop()
+        #Clock.schedule_once(sys.exit, 10)
 
 class EpicApp(App):
     title = 'Indie Chat'

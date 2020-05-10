@@ -4,8 +4,8 @@ import select
 HEADER_LENGTH = 10
 
 #IP = "127.0.0.1"
-IP = input(f'IP: ')
-
+print('Provide IP and port for text communication server')
+IP = input(f'IP: {socket.gethostbyname(socket.gethostname())}') or socket.gethostbyname(socket.gethostname())
 #PORT = 1234
 PORT = int(input(f'PORT: '))
 
@@ -32,7 +32,7 @@ sockets_list = [server_socket]
 # List of connected clients - socket as a key, user header and name as data
 clients = {}
 
-print(f'Listening for connections on {IP}:{PORT}...')
+print(f'Text chat server: Listening for connections on {IP}:{PORT}...')
 
 # Handles message receiving
 def receive_message(client_socket):
