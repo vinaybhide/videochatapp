@@ -291,11 +291,11 @@ class ChatPage(GridLayout):
         self.history.update_chat_history(f'[color=20dd20]{username}[/color] > {message}')
 
     def close_app(self, _):
-        show_error('Exiting App', True)
         socket_client_text.client_socket_text.close()
         socket_client_video.client_socket_video.close()
         cv2.waitKey(1)
         cv2.destroyAllWindows()
+        show_error('Exiting App', True)
 
         #App.get_running_app().stop()
         #Clock.schedule_once(sys.exit, 10)

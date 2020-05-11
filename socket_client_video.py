@@ -41,9 +41,9 @@ def connect(ip, port, my_username, error_callback):
     # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
     username = my_username.encode('utf-8')
     username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
-    print('before client_socket_video.send(username_header + username)')
+    #print('before client_socket_video.send(username_header + username)')
     client_socket_video.send(username_header + username)
-    print('after client_socket_video.send(username_header + username)')
+    #print('after client_socket_video.send(username_header + username)')
 
     if not (videofeed.capture.isOpened()):
         print('Can not open self capture camera')
@@ -62,9 +62,9 @@ def send(message):
 
 def start_sending_video(incoming_message_callback, error_callback):
     if (videofeed.capture.isOpened()):
-        print('before Thread send_video')
+        #print('before Thread send_video')
         Thread(target=send_video, args=(incoming_message_callback, error_callback), daemon=True).start()
-        print('after Thread send_video')
+        #print('after Thread send_video')
 
 def send_video(incoming_message_callback, error_callback):
     #global vsock
@@ -101,8 +101,9 @@ def send_video(incoming_message_callback, error_callback):
             while totalsent < send_size :
                 sent = client_socket_video.send(send_bytes)
                 if sent == 0:
-                    print("vsend: During sending frame Socket connection broken")
-                    raise RuntimeError("Socket connection broken")
+                    print("vsend: During sending frame Socket connection broken. breaking the current send operation")
+                    #raise RuntimeError("Socket connection broken")
+                    break #this means we will exit the thread and sending will stop
                 totalsent += sent
 
 
@@ -114,7 +115,7 @@ def send_video(incoming_message_callback, error_callback):
             #    break
         except Exception as e:
             # Any other exception - something happened, exit
-            print('falied in send_video. Destroying all video windows and closing video communication.')
+            print('Falied in send_video. Stopping the send thread.')
             #cv2.destroyWindow(self_username)
             #vsock = None
             #videofeed = None
@@ -127,9 +128,9 @@ def send_video(incoming_message_callback, error_callback):
 # incoming_message_callback - callback to be called when new message arrives
 # error_callback - callback to be called on error
 def start_listening(incoming_message_callback, error_callback):
-    print('before Thread listen')
+    #print('before Thread listen')
     Thread(target=listen, args=(incoming_message_callback, error_callback), daemon=True).start()
-    print('after Thread listen')
+    #print('after Thread listen')
 
 # Listens for incomming messages
 def listen(incoming_message_callback, error_callback):
@@ -143,9 +144,9 @@ def listen(incoming_message_callback, error_callback):
             #if((vsock != None) and (videofeed != None)):
             #first get the username
             # Receive our "header" containing username length, it's size is defined and constant
-            print('before client_socket_video.recv')
+            #print('before client_socket_video.recv')
             username_header = client_socket_video.recv(HEADER_LENGTH)
-            print('after client_socket_video.recv')
+            #print('after client_socket_video.recv')
 
             # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
             if not len(username_header):
@@ -153,30 +154,30 @@ def listen(incoming_message_callback, error_callback):
 
             # Convert header to int value
             username_length = int(username_header.decode('utf-8').strip())
-            print('after username_length: ' + str(username_length))
+            #print('after username_length: ' + str(username_length))
 
             # Receive and decode username
             username = client_socket_video.recv(username_length).decode('utf-8')
-            print('client_socket_video.recv: username= ' + username)
+            #print('client_socket_video.recv: username= ' + username)
 
             #now get the share of nparray. shape is (row, cols, dim) ex. shape: (480, 640, 3)
-            print('before client_socket_video.recv to get row')
+            #print('before client_socket_video.recv to get row')
             shape_row_header = client_socket_video.recv(NP_ROW_CHARS_SIZE)
             shape_row_length = int(shape_row_header.decode('utf-8').strip())
             shape_row_int = int(client_socket_video.recv(shape_row_length).decode('utf-8'))
 
-            print('before client_socket_video.recv to get col')
+            #print('before client_socket_video.recv to get col')
             shape_col_header = client_socket_video.recv(NP_COL_CHARS_SIZE)
             shape_col_length = int(shape_col_header.decode('utf-8').strip())
             shape_col_int = int(client_socket_video.recv(shape_col_length).decode('utf-8'))
 
-            print('before client_socket_video.recv to get dim')
+            #print('before client_socket_video.recv to get dim')
             shape_dim_header = client_socket_video.recv(NP_DIM_CHARS_SIZE)
             shape_dim_length = int(shape_dim_header.decode('utf-8').strip())
             shape_dim_int = int(client_socket_video.recv(shape_dim_length).decode('utf-8'))
-            print('after client_socket_video.recv to get dim')
+            #print('after client_socket_video.recv to get dim')
 
-            print('before frame = vsock.vreceive()')
+            #print('before frame = vsock.vreceive()')
             #frame = vsock.vreceive(shape_row_int*shape_col_int*shape_dim_int)
 
             totrec = 0
@@ -185,12 +186,13 @@ def listen(incoming_message_callback, error_callback):
             while totrec<message_size :
                 chunk = client_socket_video.recv(message_size - totrec)
                 if chunk == '':
-                    print("vreceive: During receiving frame socket connection broken")
-                    raise RuntimeError("Socket connection broken")
+                    print("vreceive: During receiving frame socket connection broken, Breaking the current receive operation")
+                    #raise RuntimeError("Socket connection broken")
+                    break
                 totrec += len(chunk)
                 frame = frame + chunk
 
-            print('after frame = vsock.vreceive()')
+            #print('after frame = vsock.vreceive()')
 
             # we received bytes which we need to convert to np.ndarray
             """ sample to convert nparray to bytes and bytes to nparray
@@ -203,26 +205,26 @@ def listen(incoming_message_callback, error_callback):
                 Out[7]: True            
                 dtype('uint8')
             """
-            received_nparray = np.frombuffer(frame, dtype=np.uint8)
-            received_nparray = received_nparray.reshape(shape_row_int, shape_col_int, shape_dim_int)
-            #cv2.imshow(username + '_receiver', frame)
+            if(len(frame) > 0):
+                received_nparray = np.frombuffer(frame, dtype=np.uint8)
+                received_nparray = received_nparray.reshape(shape_row_int, shape_col_int, shape_dim_int)
+                #cv2.imshow(username + '_receiver', frame)
 
-            # Now create OpenCV window for this username if not already created
-            if(cv2.getWindowProperty(username + '_receiver', 0) < 0):
-                print('cv2.getWindowProperty < 0')
-                cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
-                print('after cv2.namedWindow(username + \'_receiver\'')
+                # Now create OpenCV window for this username if not already created
+                if(cv2.getWindowProperty(username + '_receiver', 0) < 0):
+                    #print('cv2.getWindowProperty < 0')
+                    cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
+                    #print('after cv2.namedWindow(username + \'_receiver\'')
 
-            cv2.imshow(username + '_receiver', received_nparray)
-            cv2.waitKey(1)
-            print('after cv2.imshow(username + \'_receiver\'')
-            #else:
-            #    break
+                cv2.imshow(username + '_receiver', received_nparray)
+                cv2.waitKey(1)
+                #print('after cv2.imshow(username + \'_receiver\'')
         except Exception as e:
             # Any other exception - something happened, exit
-            print('falied in listen. Destroying all video windows and closing video communication.')
+            print('Falied in listen. Stopping the listen thread.')
             #cv2.destroyWindow(self_username)
             #vsock = None
             #videofeed = None
             #client_socket_video.close()
-            error_callback('Reading error: {}'.format(str(e)), False)
+            #error_callback('Reading error: {}'.format(str(e)), False)
+            break

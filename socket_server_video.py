@@ -65,130 +65,132 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         return False
 
 while True:
-
-    # Calls Unix select() system call or Windows select() WinSock call with three parameters:
-    #   - rlist - sockets to be monitored for incoming data
-    #   - wlist - sockets for data to be send to (checks if for example buffers are not full and socket is ready to send some data)
-    #   - xlist - sockets to be monitored for exceptions (we want to monitor all sockets for errors, so we can use rlist)
-    # Returns lists:
-    #   - reading - sockets we received some data on (that way we don't have to check sockets manually)
-    #   - writing - sockets ready for data to be send thru them
-    #   - errors  - sockets with some exceptions
-    # This is a blocking call, code execution will "wait" here and "get" notified in case any action should be taken
-    read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
-
-
-    # Iterate over notified sockets
-    for notified_socket in read_sockets:
-
-        # If notified socket is a server socket - new connection, accept it
-        if notified_socket == server_socket:
-
-            # Accept new connection
-            # That gives us new socket - client socket, connected to this given client only, it's unique for that client
-            # The other returned object is ip/port set
-            client_socket, client_address = server_socket.accept()
-
-            # Client should send his name right away, receive it
-            user = receive_message(client_socket, HEADER_LENGTH)
-
-            # If False - client disconnected before he sent his name
-            if user is False:
-                continue
-
-            # Add accepted socket to select.select() list
-            sockets_list.append(client_socket)
-
-            # Also save username and username header
-            clients[client_socket] = user
-
-            print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['data'].decode('utf-8')))
-
-        # Else existing socket is sending a message
-        else:
-
-            #firsr we need to get the shape of the stream
-            #first we get the rows
-            shape_rows_dict = receive_message(notified_socket, NP_ROW_CHARS_SIZE)
-            shape_cols_dict = receive_message(notified_socket, NP_COL_CHARS_SIZE)
-            shape_dim_dict = receive_message(notified_socket, NP_DIM_CHARS_SIZE)
-
-            # Text code - keeping for reference
-            """# Receive message
-            message = receive_message(notified_socket)
-            """
-            #vsockrcv = videosocket.videosocket(notified_socket)
-            #message=vsockrcv.vreceive()
-            totrec = 0
-            message_size = int((shape_rows_dict['data'].decode('utf-8')).strip()) * \
-                           int((shape_cols_dict['data'].decode('utf-8')).strip()) * \
-                           int((shape_dim_dict['data'].decode('utf-8')).strip())
-
-            message = ''.encode('utf-8')
-            while totrec<message_size :
-                chunk = notified_socket.recv(message_size - totrec)
-                if chunk == '':
-                    print("vreceive: During receiving frame socket connection broken")
-                    raise RuntimeError("Socket connection broken")
-                totrec += len(chunk)
-                message = message + chunk
+    try:
+        # Calls Unix select() system call or Windows select() WinSock call with three parameters:
+        #   - rlist - sockets to be monitored for incoming data
+        #   - wlist - sockets for data to be send to (checks if for example buffers are not full and socket is ready to send some data)
+        #   - xlist - sockets to be monitored for exceptions (we want to monitor all sockets for errors, so we can use rlist)
+        # Returns lists:
+        #   - reading - sockets we received some data on (that way we don't have to check sockets manually)
+        #   - writing - sockets ready for data to be send thru them
+        #   - errors  - sockets with some exceptions
+        # This is a blocking call, code execution will "wait" here and "get" notified in case any action should be taken
+        read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
 
 
-            # If False, client disconnected, cleanup
-            if message is False:
-                print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+        # Iterate over notified sockets
+        for notified_socket in read_sockets:
 
-                # Remove from list for socket.socket()
-                sockets_list.remove(notified_socket)
+            # If notified socket is a server socket - new connection, accept it
+            if notified_socket == server_socket:
 
-                # Remove from our list of users
-                del clients[notified_socket]
+                # Accept new connection
+                # That gives us new socket - client socket, connected to this given client only, it's unique for that client
+                # The other returned object is ip/port set
+                client_socket, client_address = server_socket.accept()
 
-                continue
+                # Client should send his name right away, receive it
+                user = receive_message(client_socket, HEADER_LENGTH)
 
-            # Get user by notified socket, so we will know who sent the message
-            user = clients[notified_socket]
+                # If False - client disconnected before he sent his name
+                if user is False:
+                    continue
 
-            #print(f'Received message from {user["data"].decode("utf-8")}') #': {message["data"].decode("utf-8")}')
+                # Add accepted socket to select.select() list
+                sockets_list.append(client_socket)
 
-            # Iterate over connected clients and broadcast message
-            for client_socket in clients:
+                # Also save username and username header
+                clients[client_socket] = user
 
-                # But don't sent it to sender
-                if client_socket != notified_socket:
-                    # Text code - keeping for reference
-                    """
-                    # Send user and message (both with their headers)
-                    # We are reusing here message header sent by sender, and saved username header send by user when he connected
-                    client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
-                    """ 
-                    print('before send user name:' + user['data'].decode('utf-8'))
-                    client_socket.send(user['header'] + user['data'])
-                    print('after send user name:' + user['data'].decode('utf-8'))
+                print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['data'].decode('utf-8')))
 
-                    #now send the shape of original stream
-                    client_socket.send(shape_rows_dict['header'] + shape_rows_dict['data'])
-                    client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])
-                    client_socket.send(shape_dim_dict['header'] + shape_dim_dict['data'])
+            # Else existing socket is sending a message
+            else:
 
-                    #vsocksend = videosocket.videosocket(client_socket)
-                    print('before vsocksend.vsend(message)')
-                    #vsocksend.vsend(message)
-                    totalsent = 0
-                    while totalsent < message_size :
-                        sent = client_socket.send(message)
-                        if sent == 0:
-                            print("Sent on 0 bytes, breaking send to username =  " + user['data'].decode('utf-8'))
-                            #raise RuntimeError("Socket connection broken")
-                            break
-                        totalsent += sent
-                    print('after vsocksend.vsend(message)')
+                #firsr we need to get the shape of the stream
+                #first we get the rows
+                shape_rows_dict = receive_message(notified_socket, NP_ROW_CHARS_SIZE)
+                shape_cols_dict = receive_message(notified_socket, NP_COL_CHARS_SIZE)
+                shape_dim_dict = receive_message(notified_socket, NP_DIM_CHARS_SIZE)
 
-    # It's not really necessary to have this, but will handle some socket exceptions just in case
-    for notified_socket in exception_sockets:
+                # Text code - keeping for reference
+                """# Receive message
+                message = receive_message(notified_socket)
+                """
+                #vsockrcv = videosocket.videosocket(notified_socket)
+                #message=vsockrcv.vreceive()
+                totrec = 0
+                message_size = int((shape_rows_dict['data'].decode('utf-8')).strip()) * \
+                            int((shape_cols_dict['data'].decode('utf-8')).strip()) * \
+                            int((shape_dim_dict['data'].decode('utf-8')).strip())
 
-        # Remove from list for socket.socket()
-        sockets_list.remove(notified_socket)
+                message = ''.encode('utf-8')
+                while totrec<message_size :
+                    chunk = notified_socket.recv(message_size - totrec)
+                    if chunk == '':
+                        #print("vreceive: During receiving frame socket connection broken")
+                        raise RuntimeError("Socket connection broken")
+                    totrec += len(chunk)
+                    message = message + chunk
 
-        # Remove from our list of users
-        del clients[notified_socket]
+
+                # If False, client disconnected, cleanup
+                if message is False:
+                    print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+
+                    # Remove from list for socket.socket()
+                    sockets_list.remove(notified_socket)
+
+                    # Remove from our list of users
+                    del clients[notified_socket]
+
+                    continue
+
+                # Get user by notified socket, so we will know who sent the message
+                user = clients[notified_socket]
+
+                #print(f'Received message from {user["data"].decode("utf-8")}') #': {message["data"].decode("utf-8")}')
+
+                # Iterate over connected clients and broadcast message
+                for client_socket in clients:
+
+                    # But don't sent it to sender
+                    if client_socket != notified_socket:
+                        # Text code - keeping for reference
+                        """
+                        # Send user and message (both with their headers)
+                        # We are reusing here message header sent by sender, and saved username header send by user when he connected
+                        client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+                        """ 
+                        #print('before send user name:' + user['data'].decode('utf-8'))
+                        client_socket.send(user['header'] + user['data'])
+                        #print('after send user name:' + user['data'].decode('utf-8'))
+
+                        #now send the shape of original stream
+                        client_socket.send(shape_rows_dict['header'] + shape_rows_dict['data'])
+                        client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])
+                        client_socket.send(shape_dim_dict['header'] + shape_dim_dict['data'])
+
+                        #vsocksend = videosocket.videosocket(client_socket)
+                        #print('before vsocksend.vsend(message)')
+                        #vsocksend.vsend(message)
+                        totalsent = 0
+                        while totalsent < message_size :
+                            sent = client_socket.send(message)
+                            if sent == 0:
+                                print("Sent on 0 bytes, breaking send to username =  " + user['data'].decode('utf-8'))
+                                #raise RuntimeError("Socket connection broken")
+                                break
+                            totalsent += sent
+                        #print('after vsocksend.vsend(message)')
+
+        # It's not really necessary to have this, but will handle some socket exceptions just in case
+        for notified_socket in exception_sockets:
+
+            # Remove from list for socket.socket()
+            sockets_list.remove(notified_socket)
+
+            # Remove from our list of users
+            del clients[notified_socket]
+    except Exception as e:
+        print('Exception in video server - ' + str(e))
