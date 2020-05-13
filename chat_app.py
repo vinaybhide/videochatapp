@@ -12,17 +12,16 @@ from kivy.base import EventLoop
 import cv2
 
 import os.path as ospath
-import socket_client_text, socket_client_video
+import socket_client_text, socket_client_video, socket_client_audio
 import sys
-from videofeed import VideoFeed
 
 
 class ConnectPage(GridLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.cols = 2
-        self.videofeed = None
-        self.is_self_video_avlbl = True
+
+        self.is_self_text_avlbl = True
 
         if(ospath.isfile('prev_details.txt')):
             with open('prev_details.txt', 'r') as f:
@@ -32,11 +31,13 @@ class ConnectPage(GridLayout):
             prev_ip = d[0]
             prev_text_port = d[1]
             prev_video_port = d[2]
-            prev_username = d[3]
+            prev_audio_port = d[3]
+            prev_username = d[4]
         else:
             prev_ip = ''
             prev_text_port = ''
             prev_video_port = ''
+            prev_audio_port = ''
             prev_username = ''
 
         self.add_widget(Label(text='IP:'))
@@ -50,6 +51,10 @@ class ConnectPage(GridLayout):
         self.add_widget(Label(text='Port for video:'))
         self.port_video = TextInput(text=prev_video_port, multiline=False)
         self.add_widget(self.port_video)
+
+        self.add_widget(Label(text='Port for audio:'))
+        self.port_audio = TextInput(text=prev_audio_port, multiline=False)
+        self.add_widget(self.port_audio)
 
         self.add_widget(Label(text='Username:'))
         self.username = TextInput(text=prev_username, multiline=False)
@@ -75,14 +80,15 @@ class ConnectPage(GridLayout):
     def join_button(self, instance):
         port_text = self.port_text.text
         port_video = self.port_video.text
+        port_audio = self.port_audio.text
         ip = self.ip.text
         username = self.username.text
 
         with open('prev_details.txt', 'w') as f:
-            f.write(f'{ip},{port_text},{port_video},{username}')
+            f.write(f'{ip},{port_text},{port_video},{port_audio},{username}')
             f.close()
 
-        info = f"Attempting to join {ip}: text port={port_text} videoport={port_video} as {username}"
+        info = f"Attempting to join {ip}: text port={port_text} videoport={port_video} audioport={port_audio} as {username}"
         chatapp.info_page.update_info(info)
         chatapp.screen_manager.current = "Info"
         Clock.schedule_once(self.connect, 1)
@@ -93,12 +99,15 @@ class ConnectPage(GridLayout):
     def connect(self, _):
         port_text = int(self.port_text.text)
         port_video = int(self.port_video.text)
+        port_audio = int(self.port_audio.text)
         ip = self.ip.text
         username = self.username.text
 
         if not socket_client_text.connect(ip, port_text, username, show_error):
             return
 
+        ###Commenting and moving the video on audio code for connection to chat page respective buttons
+        """
         #if video is not availale continue with text only
         if not socket_client_video.connect(ip, port_video, username, show_error):
             self.is_self_video_avlbl = False
@@ -107,6 +116,14 @@ class ConnectPage(GridLayout):
             #chatapp.info_page.update_info(info)
         else:
             self.is_self_video_avlbl = True
+
+        if not socket_client_audio.connect(ip, port_video, username, show_error):
+            self.is_self_audio_avlbl = False
+            print('socket_client_video.connect returned False')
+            #info = f"Can not connect to video device"
+            #chatapp.info_page.update_info(info)
+        else:
+            self.is_self_audio_avlbl = True"""
 
         
         chatapp.create_chat_page()
@@ -182,7 +199,10 @@ class ChatPage(GridLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.cols = 1
-        self.rows = 3
+        self.rows = 4
+
+        self.is_self_video_avlbl = 1
+        self.is_self_audio_avlbl = 1
 
         self.title = Label(text='Welcome: ' + chatapp.connect_page.username.text)
         self.add_widget(self.title)
@@ -197,23 +217,49 @@ class ChatPage(GridLayout):
         # We also want to bind button click to send_message method
         self.new_message = TextInput(width=Window.size[0]*0.8, size_hint_x=None, multiline=False)
         self.send = Button(text='Send Text')
-        self.send.bind(on_press=self.send_message)
-        self.start_video = Button(text='Start Video')
+        self.send.bind(on_press=self.send_text_message)
+        """self.start_video = Button(text='Start Video')
         self.start_video.bind(on_press=self.start_video_send)
         if not (chatapp.connect_page.is_self_video_avlbl):
             self.start_video.set_disabled(True)
         self.close = Button(text='Close App')
-        self.close.bind(on_press=self.close_app)
+        self.close.bind(on_press=self.close_app)"""
 
         # To be able to add 2 widgets into a layout with just one collumn, we use additional layout,
         # add widgets there, then add this layout to main layout as second row
-        #bottom_line = GridLayout(cols=2)
-        bottom_line = GridLayout(cols=4)
-        bottom_line.add_widget(self.new_message)
-        bottom_line.add_widget(self.send)
-        bottom_line.add_widget(self.start_video)
-        bottom_line.add_widget(self.close)
-        self.add_widget(bottom_line)
+        bottom_line1 = GridLayout(cols=2)
+        #bottom_line1 = GridLayout(cols=4)
+        bottom_line1.add_widget(self.new_message)
+        bottom_line1.add_widget(self.send)
+        """bottom_line1.add_widget(self.start_video)
+        bottom_line1.add_widget(self.close)"""
+        self.add_widget(bottom_line1)
+
+        #add the video start/stop audio start/stop buttons
+        self.start_video = Button(text='Start Video')
+        self.start_video.bind(on_press=self.start_video_send)
+        
+        self.stop_video = Button(text='Stop Video')
+        self.stop_video.bind(on_press=self.stop_video_send)
+        self.stop_video.set_disabled(True)
+        
+        self.start_audio = Button(text='Start Audio')
+        self.start_audio.bind(on_press=self.start_audio_send)
+
+        self.stop_audio = Button(text='Stop Audio')
+        self.stop_audio.bind(on_press=self.stop_audio_send)
+        self.stop_audio.set_disabled(True)
+
+        self.close = Button(text='Close App')
+        self.close.bind(on_press=self.close_app)
+
+        bottom_line2 = GridLayout(cols=5)
+        bottom_line2.add_widget(self.start_video)
+        bottom_line2.add_widget(self.stop_video)
+        bottom_line2.add_widget(self.start_audio)
+        bottom_line2.add_widget(self.stop_audio)
+        bottom_line2.add_widget(self.close)
+        self.add_widget(bottom_line2)
 
         Window.bind(on_key_down=self.on_key_down)
         Clock.schedule_once(self.focus_text_input, 1)
@@ -225,50 +271,128 @@ class ChatPage(GridLayout):
             socket_client_video.start_sending_video(self.show_video, show_error)
             print('after socket_client_video.start_sending_video')"""
 
+        ###commenting code below and moving it in respective button code
         #Even if self camera is not available, one should be able to see other people's video's
-        print('before socket_client_video.start_listening')
-        socket_client_video.start_listening(self.incoming_message, show_error)
-        print('after socket_client_video.start_listening')
-        #Clock.schedule_interval(self.send_video, 1.0/33.0)
+        """socket_client_video.start_listening(self.incoming_message, show_error)
+
+        socket_client_audio.start_listening(self.incoming_message, show_error)"""
 
         self.bind(size=self.adjust_fields)
 
-    def show_video(self, _=None):
+    def callback_listen_video(self, _=None):
+        return
+
+    def callback_listen_audio(self, _=None):
+        return
+
+    def callback_send_video(self, _=None):
+        return
+
+    def callback_send_audio(self, _=None):
         return
 
     # Updates page layout
     def adjust_fields(self, *_):
 
         # Chat history height - 90%, but at least 50px for bottom new message/send button part
-        if Window.size[1] * 0.1 < 50:
-            new_height = Window.size[1] - 50
+        #if Window.size[1] * 0.1 < 50:
+        if Window.size[1] * 0.2 < 120:
+            #new_height = Window.size[1] - 50
+            new_height = Window.size[1] - 120
         else:
-            new_height = Window.size[1] * 0.9
+            #new_height = Window.size[1] * 0.9
+            new_height = Window.size[1] * 0.8
         self.history.height = new_height
 
         # New message input width - 80%, but at least 160px for send button
-        #if Window.size[0] * 0.2 < 160:
-        if Window.size[0] * 0.4 < 320:
-            #new_width = Window.size[0] - 160
-            new_width = Window.size[0] - 320
+        if Window.size[0] * 0.2 < 160:
+        #if Window.size[0] * 0.4 < 320:
+            new_width = Window.size[0] - 160
+            #new_width = Window.size[0] - 320
         else:
-            #new_width = Window.size[0] * 0.8
-            new_width = Window.size[0] * 0.6
+            new_width = Window.size[0] * 0.8
+            #new_width = Window.size[0] * 0.6
         self.new_message.width = new_width
 
         # Update chat history layout
         #self.history.update_chat_history_layout()
         Clock.schedule_once(self.history.update_chat_history_layout, 0.01)
-    
+
+    def start_audio_send(self, _):
+        port_audio = int(chatapp.connect_page.port_audio.text)
+        ip = chatapp.connect_page.ip.text
+        username = chatapp.connect_page.username.text
+
+        self.is_self_audio_avlbl_avlbl = socket_client_video.connect(ip, port_audio, username, show_error)
+        if self.is_self_audio_avlbl_avlbl == -1:
+            #this means client was not able to connect to server, we will not be able to use video chat at all
+            print('socket_client_audio.connect returned -1: Not able to connect to server')
+            self.start_audio.set_disabled(False)
+            self.stop_audio.set_disabled(True)
+        elif self.is_self_audio_avlbl == -2:
+            #means error while sending the username, which means we do not have connection 
+            # to server or server refused
+            print('socket_client_audio.connect returned -2: send of username failed and return <= 0')
+            self.start_audio.set_disabled(False)
+            self.stop_audio.set_disabled(True)
+        else:   #we got connected
+            self.start_audio.set_disabled(True)
+            self.stop_audio.set_disabled(False)
+            socket_client_audio.start_listening(self.callback_listen_audio, show_error)
+            socket_client_audio.start_sending_video(self.callback_send_audio, show_error)
+
+    def stop_audio_send(self, _):
+        #connection is good, we have the self video window and we were able to send our username
+        self.start_audio.set_disabled(False)
+        self.stop_audio.set_disabled(True)
+        socket_client_audio.stop_audio_comm()
+
     def start_video_send(self, _):
-        if(chatapp.connect_page.is_self_video_avlbl):
-            print('before socket_client_video.start_sending_video')
-            socket_client_video.start_sending_video(self.show_video, show_error)
-            print('after socket_client_video.start_sending_video')
+        port_video = int(chatapp.connect_page.port_video.text)
+        ip = chatapp.connect_page.ip.text
+        username = chatapp.connect_page.username.text
+
+        #connect to server
+            
+        self.is_self_video_avlbl = socket_client_video.connect(ip, port_video, username, show_error)
+        if self.is_self_video_avlbl == -1:     #not socket_client_video.connect(ip, port_video, username, show_error):
+            #this means client was not able to connect to server, we will not be able to use video chat at all
+            print('socket_client_video.connect returned -1: Not able to connect to server')
+            self.start_video.set_disabled(False)
+            self.stop_video.set_disabled(True)
+            #info = f"Can not connect to video device"
+            #chatapp.info_page.update_info(info)
+        elif self.is_self_video_avlbl == -2:
+            #means error while sending the username, which means we do not have connection 
+            # to server or server refused
+            print('socket_client_video.connect returned -2: send of username failed and return <= 0')
+            self.start_video.set_disabled(False)
+            self.stop_video.set_disabled(True)
+        elif self.is_self_video_avlbl == -3:
+            #connection is good, we were able to send self username but error occurred 
+            # while creating self video window and we do not have self video window
+            print('socket_client_video.connect returned -3: No camera connected so only listen & show')
+            self.start_video.set_disabled(True)
+            self.stop_video.set_disabled(False)
+            socket_client_video.start_listening(self.callback_listen_video, show_error)
+        else:   # self.is_self_video_avlbl == 1:
+            #connection is good, we have the self video window and we were able to send our username
+            self.is_self_video_avlbl = True
+            self.start_video.set_disabled(True)
+            self.stop_video.set_disabled(False)
+            socket_client_video.start_listening(self.callback_listen_video, show_error)
+            socket_client_video.start_sending_video(self.callback_send_video, show_error)
+
+    def stop_video_send(self, _):
+        #connection is good, we have the self video window and we were able to send our username
+        self.start_video.set_disabled(False)
+        self.stop_video.set_disabled(True)
+        socket_client_video.close_connection()
+
 
     # Gets called when either Send button or Enter key is being pressed
     # (kivy passes button object here as well, but we don;t care about it)
-    def send_message(self, _):
+    def send_text_message(self, _):
         message = self.new_message.text
         self.new_message.text = ''
         
@@ -282,7 +406,7 @@ class ChatPage(GridLayout):
 
     def on_key_down(self, instance, keyboard, keycode, text, modifiers):
         if(keycode == 40):
-            self.send_message(None)
+            self.send_text_message(None)
     def focus_text_input(self, _):
         self.new_message.focus = True
      
@@ -292,9 +416,10 @@ class ChatPage(GridLayout):
 
     def close_app(self, _):
         socket_client_text.client_socket_text.close()
-        socket_client_video.client_socket_video.close()
-        cv2.waitKey(1)
-        cv2.destroyAllWindows()
+        self.stop_audio_send(_=None)
+        self.stop_video_send(_=None)
+        #cv2.waitKey(1)
+        #cv2.destroyAllWindows()
         show_error('Exiting App', True)
 
         #App.get_running_app().stop()

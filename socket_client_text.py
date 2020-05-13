@@ -47,7 +47,6 @@ def start_listening(incoming_message_callback, error_callback):
 # Listens for incomming messages
 def listen(incoming_message_callback, error_callback):
     while True:
-
         try:
             # Now we want to loop over received messages (there might be more than one) and print them
             while True:

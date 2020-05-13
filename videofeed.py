@@ -16,9 +16,8 @@ class VideoFeed:
         self.name=name
         if capture == 1:
             self.capture = cv2.VideoCapture(self.camera_index) #.CaptureFromCAM(self.camera_index)
-        
-        if not (self.capture.isOpened()):
-            cv2.destroyWindow(name)
+            if not (self.capture.isOpened()):
+                cv2.destroyWindow(name)
 
     def get_frame(self):
         ret, self.frame =  self.capture.read() #cv2.QueryFrame(self.capture)
