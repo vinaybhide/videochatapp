@@ -51,7 +51,6 @@ def connect(ip, port, my_username, error_callback):
     # Prepare username and header and send them
     # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
     try:
-        self_username = my_username
         username = my_username.encode('utf-8')
         username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
         #print('before client_socket_video.send(username_header + username)')
@@ -117,7 +116,7 @@ def stop_send_thread():
         pill_to_kill_send_thread.set()
         while(thread_send_video.is_alive() == True):
             None
-        send('CLOSING')
+    send('CLOSING')
     
     thread_send_video = None
 
@@ -175,7 +174,9 @@ def send_video(send_callback, error_callback):
                 #now send the entire nparray as bytes
                 send_bytes = frame.tobytes()
                 totalsent = 0
-                send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
+                #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
+                send_size = len(send_bytes)
+                send(str(send_size))
                 while totalsent < send_size :
                     sent = client_socket_video.send(send_bytes)
                     if sent == 0:
@@ -209,7 +210,7 @@ def send_video(send_callback, error_callback):
     #and then they will continue to wait for a new message from server
     #send('CLOSING')
     print('Stopped send video thread')
-    pill_to_kill_send_thread = None
+    #pill_to_kill_send_thread = None
 
 # Starts listening function in a thread
 # incoming_message_callback - callback to be called when new message arrives
@@ -284,12 +285,14 @@ def listen(listen_callback, error_callback):
                 shape_dim_int = int(client_socket_video.recv(shape_dim_length).decode('utf-8'))
                 #print('after client_socket_video.recv to get dim')
 
-                #print('before frame = vsock.vreceive()')
-                #frame = vsock.vreceive(shape_row_int*shape_col_int*shape_dim_int)
+                #get the size of the bytes array
+                message_size_header = client_socket_video.recv(HEADER_LENGTH)
+                message_size_length = int(message_size_header.decode('utf-8').strip())
+                message_size = int(client_socket_video.recv(message_size_length).decode('utf-8'))
 
                 totrec = 0
                 frame = ''.encode('utf-8')
-                message_size = shape_row_int*shape_col_int*shape_dim_int
+                #message_size = shape_row_int*shape_col_int*shape_dim_int
                 while totrec<message_size :
                     chunk = client_socket_video.recv(message_size - totrec)
                     if chunk == '':
@@ -328,12 +331,13 @@ def listen(listen_callback, error_callback):
                     #print('after cv2.imshow(username + \'_receiver\'')
         except Exception as e:
             # Any other exception - something happened, exit
-            print('Falied in listen. Stopping the listen thread. :' + str(e))
+            print('Falied in listen :' + str(e))
             #cv2.destroyWindow(self_username)
             #vsock = None
             #videofeed = None
             #client_socket_video.close()
             #error_callback('Reading error: {}'.format(str(e)), False)
             #break
+    #since we are out of while, that means a 'CLOSING' message was received by a 
     print('Stopped listen video thread')
-    pill_to_kill_listen_thread = None
+    #pill_to_kill_listen_thread = None

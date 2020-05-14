@@ -145,16 +145,32 @@ while True:
                         continue
 
                     totrec = 0
-                    message_size = int((shape_rows_dict['data'].decode('utf-8')).strip()) * \
+                    """message_size = int((shape_rows_dict['data'].decode('utf-8')).strip()) * \
                                 int((shape_cols_dict['data'].decode('utf-8')).strip()) * \
-                                int((shape_dim_dict['data'].decode('utf-8')).strip())
+                                int((shape_dim_dict['data'].decode('utf-8')).strip())"""
+
+                    message_size_dict = receive_message(notified_socket, HEADER_LENGTH)
+                    if(message_size_dict is False):
+                        print('(message_size_dict is False)')
+                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                        # Remove from list for socket.socket()
+                        sockets_list.remove(notified_socket)
+
+                        # Remove from our list of users
+                        del clients[notified_socket]
+
+                        continue
+
+                    message_size = int((message_size_dict['data'].decode('utf-8')).strip())
+                    
                     message = ''.encode('utf-8')
                     while totrec<message_size :
                         chunk = notified_socket.recv(message_size - totrec)
                         #if chunk == '':
                         if chunk is False:
-                            print('Inside if chunk is False:')
-                            raise RuntimeError("Socket connection broken")
+                            print("Received empty chunk of video: During receiving frame socket connection broken")
+                            #raise RuntimeError("Socket connection broken")
+                            break
                         totrec += len(chunk)
                         message = message + chunk
 
@@ -197,9 +213,9 @@ while True:
                             client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])
                             client_socket.send(shape_dim_dict['header'] + shape_dim_dict['data'])
 
-                            #vsocksend = videosocket.videosocket(client_socket)
-                            #print('before vsocksend.vsend(message)')
-                            #vsocksend.vsend(message)
+                            #send the size of the message
+                            client_socket.send(message_size_dict['header'] + message_size_dict['data'])
+
                             totalsent = 0
                             while totalsent < message_size :
                                 sent = client_socket.send(message)
@@ -208,7 +224,6 @@ while True:
                                     #raise RuntimeError("Socket connection broken")
                                     break
                                 totalsent += sent
-                            #print('after vsocksend.vsend(message)')
 
         # It's not really necessary to have this, but will handle some socket exceptions just in case
         for notified_socket in exception_sockets:

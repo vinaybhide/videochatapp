@@ -106,29 +106,11 @@ while True:
             # Else existing socket is sending a message
             else:
 
-                #firsr we need to get the shape of the stream
-                #first we get the rows
-                shape_rows_dict = receive_message(notified_socket, NP_ROW_CHARS_SIZE)
-                shape_cols_dict = receive_message(notified_socket, NP_COL_CHARS_SIZE)
-
-                totrec = 0
-                message_size = int((shape_rows_dict['data'].decode('utf-8')).strip()) * \
-                            int((shape_cols_dict['data'].decode('utf-8')).strip())
-
-                message = ''.encode('utf-8')
-                while totrec<message_size :
-                    chunk = notified_socket.recv(message_size - totrec)
-                    if chunk == '':
-                        print("Received empty chunk of audio: During receiving frame socket connection broken")
-                        #raise RuntimeError("Socket connection broken")
-                    totrec += len(chunk)
-                    message = message + chunk
-
-
-                # If False, client disconnected, cleanup
-                if message is False:
+                #we must get a message with keyword DATA or CLOSING prior to any other message
+                keyword_dict = receive_message(notified_socket, HEADER_LENGTH)
+                if( keyword_dict is False):
+                    print('keyword_dict is False')
                     print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
-
                     # Remove from list for socket.socket()
                     sockets_list.remove(notified_socket)
 
@@ -136,40 +118,115 @@ while True:
                     del clients[notified_socket]
 
                     continue
+                keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
+                if(keyword_message.upper() == 'CLOSING'):
+                    print('keyword = CLOSING')
+                    user = clients[notified_socket]
+                    for client_socket in clients:
+                        # But don't sent it to sender
+                        if client_socket != notified_socket:
+                            client_socket.send(user['header'] + user['data'])
+                            client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                elif(keyword_message.upper() == 'DATA'):
+                    #firsr we need to get the shape of the stream
+                    #first we get the rows
+                    shape_rows_dict = receive_message(notified_socket, NP_ROW_CHARS_SIZE)
+                    shape_cols_dict = receive_message(notified_socket, NP_COL_CHARS_SIZE)
 
-                # Get user by notified socket, so we will know who sent the message
-                user = clients[notified_socket]
+                    if( (shape_rows_dict is False) or (shape_cols_dict is False)):
+                        print('(shape_rows_dict is False) or (shape_cols_dict is False)):')
+                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                        # Remove from list for socket.socket()
+                        sockets_list.remove(notified_socket)
 
-                #print(f'Received message from {user["data"].decode("utf-8")}') #': {message["data"].decode("utf-8")}')
+                        # Remove from our list of users
+                        del clients[notified_socket]
 
-                # Iterate over connected clients and broadcast message
-                for client_socket in clients:
+                        continue
 
-                    # But don't sent it to sender
-                    if client_socket != notified_socket:
-                        # Text code - keeping for reference
-                        """
-                        # Send user and message (both with their headers)
-                        # We are reusing here message header sent by sender, and saved username header send by user when he connected
-                        client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
-                        """ 
-                        #print('before send user name:' + user['data'].decode('utf-8'))
-                        client_socket.send(user['header'] + user['data'])
-                        #print('after send user name:' + user['data'].decode('utf-8'))
+                    totrec = 0
+                    """message_size = int((shape_rows_dict['data'].decode('utf-8')).strip()) * \
+                                int((shape_cols_dict['data'].decode('utf-8')).strip())"""
+                    #get the size of byte stream
+                    message_size_dict = receive_message(notified_socket, HEADER_LENGTH)
+                    if(message_size_dict is False):
+                        print('(message_size_dict is False)')
+                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                        # Remove from list for socket.socket()
+                        sockets_list.remove(notified_socket)
 
-                        #now send the shape of original stream
-                        client_socket.send(shape_rows_dict['header'] + shape_rows_dict['data'])
-                        client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])
+                        # Remove from our list of users
+                        del clients[notified_socket]
 
-                        totalsent = 0
-                        while totalsent < message_size :
-                            sent = client_socket.send(message)
-                            if sent == 0:
-                                print("Sent on 0 bytes, breaking send to username =  " + user['data'].decode('utf-8'))
-                                #raise RuntimeError("Socket connection broken")
-                                break
-                            totalsent += sent
-                        #print('after vsocksend.vsend(message)')
+                        continue
+
+                    message_size = int((message_size_dict['data'].decode('utf-8')).strip())
+                    message = ''.encode('utf-8')
+                    while totrec<message_size :
+                        chunk = notified_socket.recv(message_size - totrec)
+                        if chunk is False:
+                            print("Received empty chunk of audio: During receiving frame socket connection broken")
+                            #raise RuntimeError("Socket connection broken")
+                            break
+                        totrec += len(chunk)
+                        message = message + chunk
+
+
+                    # If False, client disconnected, cleanup
+                    if message is False:
+                        print('message is False:')
+                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+
+                        # Remove from list for socket.socket()
+                        sockets_list.remove(notified_socket)
+
+                        # Remove from our list of users
+                        del clients[notified_socket]
+
+                        continue
+
+                    # Get user by notified socket, so we will know who sent the message
+                    user = clients[notified_socket]
+
+                    #print(f'Received message from {user["data"].decode("utf-8")}') #': {message["data"].decode("utf-8")}')
+
+                    # Iterate over connected clients and broadcast message
+                    for client_socket in clients:
+
+                        # But don't sent it to sender
+                        if client_socket != notified_socket:
+                            # Text code - keeping for reference
+                            """
+                            # Send user and message (both with their headers)
+                            # We are reusing here message header sent by sender, and saved username header send by user when he connected
+                            client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+                            """ 
+                            print('before send user name: + user[data].decode(utf-8)')
+                            client_socket.send(user['header'] + user['data'])
+                            print('before send user name: + user[data].decode(utf-8)')
+
+                            client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+
+                            #now send the shape of original stream
+                            print('before : client_socket.send(shape_rows_dict, shape_rows_dict')
+                            client_socket.send(shape_rows_dict['header'] + shape_rows_dict['data'])
+                            client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])
+                            print('after : client_socket.send(shape_cols_dict, shape_cols_dict')
+
+                            #send the size of the message
+                            client_socket.send(message_size_dict['header'] + message_size_dict['data'])
+
+                            totalsent = 0
+                            while totalsent < message_size :
+                                print('before : sent = client_socket.send(message)')
+                                sent = client_socket.send(message)
+                                if sent == 0:
+                                    print("Sent on 0 bytes, breaking send to username =  " + user['data'].decode('utf-8'))
+                                    #raise RuntimeError("Socket connection broken")
+                                    break
+                                totalsent += sent
+                                print('after : sent = client_socket.send(message)')
+                            #print('after vsocksend.vsend(message)')
 
         # It's not really necessary to have this, but will handle some socket exceptions just in case
         for notified_socket in exception_sockets:

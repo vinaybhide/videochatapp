@@ -323,7 +323,7 @@ class ChatPage(GridLayout):
         ip = chatapp.connect_page.ip.text
         username = chatapp.connect_page.username.text
 
-        self.is_self_audio_avlbl_avlbl = socket_client_video.connect(ip, port_audio, username, show_error)
+        self.is_self_audio_avlbl_avlbl = socket_client_audio.connect(ip, port_audio, username, show_error)
         if self.is_self_audio_avlbl_avlbl == -1:
             #this means client was not able to connect to server, we will not be able to use video chat at all
             print('socket_client_audio.connect returned -1: Not able to connect to server')
@@ -339,7 +339,7 @@ class ChatPage(GridLayout):
             self.start_audio.set_disabled(True)
             self.stop_audio.set_disabled(False)
             socket_client_audio.start_listening(self.callback_listen_audio, show_error)
-            socket_client_audio.start_sending_video(self.callback_send_audio, show_error)
+            socket_client_audio.start_sending_audio(self.callback_send_audio, show_error)
 
     def stop_audio_send(self, _):
         #connection is good, we have the self video window and we were able to send our username
