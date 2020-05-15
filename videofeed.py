@@ -8,7 +8,7 @@ import numpy as np
 class VideoFeed:
 
     def __init__(self,mode=1,name="w1",capture=1):
-        print(name)
+        #print(name)
         if mode == 1:
             cv2.startWindowThread() #.StartWindowThread()
             cv2.namedWindow(name, cv2.WINDOW_AUTOSIZE) #.NamedWindow(name, cv2.VideoCapture.CV_WINDOW_AUTOSIZE)

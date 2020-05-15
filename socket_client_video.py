@@ -16,10 +16,10 @@ thread_send_video = None
 thread_listen_video = None
 pill_to_kill_send_thread = None
 pill_to_kill_listen_thread = None
+stop_connection = False
 
 videofeed = None
 self_username = ''
-is_socket_open = True
 
 #currently this is getting called from ConnectPage. 
 # But i think this needs to get called from 'Start Video' button. Will need to check this logic
@@ -32,10 +32,11 @@ def connect(ip, port, my_username, error_callback):
     global self_username
     global pill_to_kill_send_thread
     global pill_to_kill_listen_thread
-
+    global stop_connection
     # Create a socket
     # socket.AF_INET - address family, IPv4, some otehr possible are AF_INET6, AF_BLUETOOTH, AF_UNIX
     # socket.SOCK_STREAM - TCP, conection-based, socket.SOCK_DGRAM - UDP, connectionless, datagrams, socket.SOCK_RAW - raw IP packets
+    stop_connection = False
     try:
         client_socket_video = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -51,6 +52,7 @@ def connect(ip, port, my_username, error_callback):
     # Prepare username and header and send them
     # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
     try:
+        self_username = my_username
         username = my_username.encode('utf-8')
         username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
         #print('before client_socket_video.send(username_header + username)')
@@ -95,16 +97,61 @@ def close_connection():
     stop_video_comm()    
     if( client_socket_video != None ):
         client_socket_video.close()
-    if (videofeed.capture.isOpened()):
-        videofeed.capture.release()
-        cv2.destroyWindow(self_username)
     
-    videofeed = None
+    #videofeed = None
     client_socket_video = None
 
 def stop_video_comm():
-    stop_send_thread()
-    stop_listen_thread()
+    global stop_connection
+
+    stop_connection = True
+
+    #wait for the send thread to close
+    try:
+        while(thread_send_video.is_alive()):
+            print('waiting for send thread to become None')
+    except Exception as e:
+        print('stopped send thread')
+
+    if (videofeed.capture.isOpened()):
+        videofeed.capture.release()
+        cv2.destroyWindow(self_username)
+
+    #send CLOSING
+    if( client_socket_video != None ):
+        send('CLOSING')
+
+    try:
+        while(thread_listen_video.is_alive()):
+            print('waiting for listen thread to become None')
+    except Exception as e:
+        print('stopped listen thread')
+
+    cv2.destroyAllWindows()
+
+def stop_video_comm1():
+    #stop_send_thread()
+    #stop_listen_thread()
+    if( client_socket_video != None ):
+        send('CLOSING')
+
+    try:
+        while(thread_listen_video.is_alive()):
+            print('waiting for listen thread to become None')
+    except Exception as e:
+        print('stopped listen thread')
+
+    try:
+        while(thread_send_video.is_alive()):
+            print('waiting for send thread to become None')
+    except Exception as e:
+        print('stopped send thread')
+
+
+    if (videofeed.capture.isOpened()):
+        videofeed.capture.release()
+        cv2.destroyWindow(self_username)
+
     cv2.destroyAllWindows()
 
 def stop_send_thread():
@@ -115,8 +162,9 @@ def stop_send_thread():
         #thread_send_video._stop()
         pill_to_kill_send_thread.set()
         while(thread_send_video.is_alive() == True):
-            None
-    send('CLOSING')
+            print('waiting for send thread to close')
+    if( client_socket_video != None ):
+        send('CLOSING')
     
     thread_send_video = None
 
@@ -126,7 +174,9 @@ def stop_listen_thread():
 
     if( (thread_listen_video != None) and (thread_listen_video.is_alive() == True)):
         #thread_listen_video._stop()
-        pill_to_kill_listen_thread.set()
+        while(thread_listen_video.is_alive() == True):
+            print('waiting for listen thread to close')
+        #pill_to_kill_listen_thread.set()
 
     thread_listen_video = None
 
@@ -158,37 +208,42 @@ def send_video(send_callback, error_callback):
             #get_frame returns np.ndarray, change the np.ndarray to bytes and then send bytes
             #we also need to send the shape of nparray so that it can be reconstructed in reveice
 
-            if(client_socket_video != None):
-                shape_row_bytes = (str(frame.shape[0])).encode('utf-8')
-                message_header = f"{len(shape_row_bytes):<{NP_ROW_CHARS_SIZE}}".encode('utf-8')
-                client_socket_video.send(message_header + shape_row_bytes)
+            #if(client_socket_video != None):
+            shape_row_bytes = (str(frame.shape[0])).encode('utf-8')
+            message_header = f"{len(shape_row_bytes):<{NP_ROW_CHARS_SIZE}}".encode('utf-8')
+            client_socket_video.send(message_header + shape_row_bytes)
 
-                shape_col_bytes = (str(frame.shape[1])).encode('utf-8')
-                message_header = f"{len(shape_col_bytes):<{NP_COL_CHARS_SIZE}}".encode('utf-8')
-                client_socket_video.send(message_header + shape_col_bytes)
+            shape_col_bytes = (str(frame.shape[1])).encode('utf-8')
+            message_header = f"{len(shape_col_bytes):<{NP_COL_CHARS_SIZE}}".encode('utf-8')
+            client_socket_video.send(message_header + shape_col_bytes)
 
-                shape_dim_bytes = (str(frame.shape[2])).encode('utf-8')
-                message_header = f"{len(shape_dim_bytes):<{NP_DIM_CHARS_SIZE}}".encode('utf-8')
-                client_socket_video.send(message_header + shape_dim_bytes)
+            shape_dim_bytes = (str(frame.shape[2])).encode('utf-8')
+            message_header = f"{len(shape_dim_bytes):<{NP_DIM_CHARS_SIZE}}".encode('utf-8')
+            client_socket_video.send(message_header + shape_dim_bytes)
 
-                #now send the entire nparray as bytes
-                send_bytes = frame.tobytes()
-                totalsent = 0
-                #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
-                send_size = len(send_bytes)
-                send(str(send_size))
-                while totalsent < send_size :
-                    sent = client_socket_video.send(send_bytes)
-                    if sent == 0:
-                        print("vsend: During sending frame Socket connection broken. breaking the current send operation")
-                        #raise RuntimeError("Socket connection broken")
-                        break #this means we will exit the thread and sending will stop
-                    totalsent += sent
+            #now send the entire nparray as bytes
+            send_bytes = frame.tobytes()
+            totalsent = 0
+            #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
+            send_size = len(send_bytes)
+            send(str(send_size))
+            while totalsent < send_size :
+                sent = client_socket_video.send(send_bytes)
+                if sent == 0:
+                    print("client_socket_video.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
+                    #raise RuntimeError("Socket connection broken")
+                    break #this means we will exit the thread and sending will stop
+                totalsent += sent
 
 
             #vsock.vsend(send_bytes, (frame.shape[0] * frame.shape[1] * frame.shape[2]))
             #vsock.vsend(frame)
-            videofeed.set_frame(frame)  
+            videofeed.set_frame(frame)
+            if(stop_connection == True):
+                #print('before pill_to_kill_send_thread.set()')
+                pill_to_kill_send_thread.set()
+                #print('after pill_to_kill_send_thread.set()')
+                break
             #else:
             #    cv2.destroyAllWindows()
             #    break
@@ -228,7 +283,10 @@ def listen(listen_callback, error_callback):
     #global vsock
     #global videofeed
     global pill_to_kill_listen_thread
-    
+    global pill_to_kill_send_thread
+    global thread_listen_video
+    global thread_send_video
+
     # Now we want to loop over received messages (there might be more than one) and print them
     #while True:
     while not pill_to_kill_listen_thread.wait(0):
@@ -242,7 +300,7 @@ def listen(listen_callback, error_callback):
             # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
             if not len(username_header):
                 #error_callback('Connection closed by the server', False)
-                print('Connection closed by server')
+                print('Connection closed by server: if not len(username_header):')
                 continue
 
             # Convert header to int value
@@ -256,7 +314,7 @@ def listen(listen_callback, error_callback):
             keyword_header = client_socket_video.recv(HEADER_LENGTH)
             if not len(keyword_header):
                 #error_callback('Connection closed by the server', False)
-                print('Connection closed by server')
+                print('Connection closed by server in keyword_header = client_socket_video.recv(HEADER_LENGTH)')
                 continue
 
             # Convert header to int value
@@ -267,6 +325,9 @@ def listen(listen_callback, error_callback):
                 #we need to close the video window of the specific sender
                 if(cv2.getWindowProperty(username + '_receiver', 0) == 0):
                     cv2.destroyWindow(username + '_receiver')
+            elif(keyworkd_message.upper() == 'ACK_CLOSED'):
+                pill_to_kill_listen_thread.set()
+                break
             elif(keyworkd_message.upper() == 'DATA'):
                 #now get the share of nparray. shape is (row, cols, dim) ex. shape: (480, 640, 3)
                 #print('before client_socket_video.recv to get row')
@@ -296,7 +357,7 @@ def listen(listen_callback, error_callback):
                 while totrec<message_size :
                     chunk = client_socket_video.recv(message_size - totrec)
                     if chunk == '':
-                        print("vreceive: During receiving frame socket connection broken, Breaking the current receive operation")
+                        print("client_socket_video.recv(message_size - totrec): During receiving frame socket connection broken, Breaking the current receive operation")
                         #raise RuntimeError("Socket connection broken")
                         break
                     totrec += len(chunk)
@@ -321,13 +382,13 @@ def listen(listen_callback, error_callback):
                     #cv2.imshow(username + '_receiver', frame)
 
                     # Now create OpenCV window for this username if not already created
-                    if(cv2.getWindowProperty(username + '_receiver', 0) < 0):
+                    #if(cv2.getWindowProperty(username + '_receiver', 0) < 0):
                         #print('cv2.getWindowProperty < 0')
-                        cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
-                        #print('after cv2.namedWindow(username + \'_receiver\'')
-
-                    cv2.imshow(username + '_receiver', received_nparray)
-                    cv2.waitKey(1)
+                cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
+                    #print('after cv2.namedWindow(username + \'_receiver\'')
+                
+                cv2.imshow(username + '_receiver', received_nparray)
+                x = cv2.waitKey(1)
                     #print('after cv2.imshow(username + \'_receiver\'')
         except Exception as e:
             # Any other exception - something happened, exit
@@ -339,5 +400,7 @@ def listen(listen_callback, error_callback):
             #error_callback('Reading error: {}'.format(str(e)), False)
             #break
     #since we are out of while, that means a 'CLOSING' message was received by a 
+    pill_to_kill_listen_thread.set()
+    if(pill_to_kill_send_thread != None):
+        pill_to_kill_send_thread.set()
     print('Stopped listen video thread')
-    #pill_to_kill_listen_thread = None

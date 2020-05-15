@@ -345,8 +345,8 @@ class ChatPage(GridLayout):
         #connection is good, we have the self video window and we were able to send our username
         self.start_audio.set_disabled(False)
         self.stop_audio.set_disabled(True)
-        socket_client_audio.stop_audio_comm()
-
+        socket_client_audio.close_connection()
+    
     def start_video_send(self, _):
         port_video = int(chatapp.connect_page.port_video.text)
         ip = chatapp.connect_page.ip.text
@@ -418,11 +418,9 @@ class ChatPage(GridLayout):
         socket_client_text.client_socket_text.close()
         self.stop_audio_send(_=None)
         self.stop_video_send(_=None)
-        #cv2.waitKey(1)
-        #cv2.destroyAllWindows()
-        show_error('Exiting App', True)
+        #show_error('Exiting App', True)
 
-        #App.get_running_app().stop()
+        App.get_running_app().stop()
         #Clock.schedule_once(sys.exit, 10)
 
 class EpicApp(App):

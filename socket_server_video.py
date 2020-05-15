@@ -64,6 +64,11 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         # and that's also a cause when we receive an empty message
         return False
 
+def send_ack(client_socket, message):
+    # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+    message = message.encode('utf-8')
+    message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+    client_socket.send(message_header + message)
 
 while True:
     try:
@@ -111,7 +116,7 @@ while True:
                 #we must get a message with keyword DATA or CLOSING prior to any other message
                 keyword_dict = receive_message(notified_socket, HEADER_LENGTH)
                 if( keyword_dict is False):
-                    print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                    print('keyword_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                     # Remove from list for socket.socket()
                     sockets_list.remove(notified_socket)
 
@@ -127,6 +132,13 @@ while True:
                         if client_socket != notified_socket:
                             client_socket.send(user['header'] + user['data'])
                             client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                    notified_socket.send(user['header'] + user['data'])
+                    send_ack(notified_socket, 'ACK_CLOSED')
+
+                    sockets_list.remove(notified_socket)
+                    # Remove from our list of users
+                    del clients[notified_socket]
+
                 elif(keyword_message.upper() == 'DATA'):
                     #firsr we need to get the shape of the stream
                     #first we get the rows
@@ -135,7 +147,7 @@ while True:
                     shape_dim_dict = receive_message(notified_socket, NP_DIM_CHARS_SIZE)
 
                     if( (shape_rows_dict is False) or (shape_cols_dict is False) or (shape_dim_dict is False)):
-                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                        print('shape is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                         # Remove from list for socket.socket()
                         sockets_list.remove(notified_socket)
 
@@ -151,8 +163,8 @@ while True:
 
                     message_size_dict = receive_message(notified_socket, HEADER_LENGTH)
                     if(message_size_dict is False):
-                        print('(message_size_dict is False)')
-                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                        #print('(message_size_dict is False)')
+                        print('message_size_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                         # Remove from list for socket.socket()
                         sockets_list.remove(notified_socket)
 
@@ -168,7 +180,7 @@ while True:
                         chunk = notified_socket.recv(message_size - totrec)
                         #if chunk == '':
                         if chunk is False:
-                            print("Received empty chunk of video: During receiving frame socket connection broken")
+                            print("While receiving chunk received empty chunk of video: During receiving frame socket connection broken")
                             #raise RuntimeError("Socket connection broken")
                             break
                         totrec += len(chunk)
@@ -177,7 +189,7 @@ while True:
 
                     # If False, client disconnected, cleanup
                     if message is False:
-                        print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                        print('message is False:, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                         # Remove from list for socket.socket()
                         sockets_list.remove(notified_socket)
 
@@ -220,7 +232,7 @@ while True:
                             while totalsent < message_size :
                                 sent = client_socket.send(message)
                                 if sent == 0:
-                                    print("Sent on 0 bytes, breaking send to username =  " + user['data'].decode('utf-8'))
+                                    print("client_socket.send(message) returned 0 bytes, breaking send to username =  " + user['data'].decode('utf-8'))
                                     #raise RuntimeError("Socket connection broken")
                                     break
                                 totalsent += sent
