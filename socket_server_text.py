@@ -35,12 +35,12 @@ clients = {}
 print(f'Text chat server: Listening for connections on {IP}:{PORT}...')
 
 # Handles message receiving
-def receive_message(client_socket):
+def receive_message(client_socket, receive_size=HEADER_LENGTH):
 
     try:
 
         # Receive our "header" containing message length, it's size is defined and constant
-        message_header = client_socket.recv(HEADER_LENGTH)
+        message_header = client_socket.recv(receive_size)
 
         # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
         if not len(message_header):
@@ -59,6 +59,12 @@ def receive_message(client_socket):
         # socket.close() also invokes socket.shutdown(socket.SHUT_RDWR) what sends information about closing the socket (shutdown read/write)
         # and that's also a cause when we receive an empty message
         return False
+
+def send_ack(client_socket, message):
+    # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+    message = message.encode('utf-8')
+    message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+    client_socket.send(message_header + message)
 
 while True:
 
@@ -86,7 +92,7 @@ while True:
             client_socket, client_address = server_socket.accept()
 
             # Client should send his name right away, receive it
-            user = receive_message(client_socket)
+            user = receive_message(client_socket, HEADER_LENGTH)
 
             # If False - client disconnected before he sent his name
             if user is False:
@@ -103,13 +109,11 @@ while True:
         # Else existing socket is sending a message
         else:
 
-            # Receive message
-            message = receive_message(notified_socket)
-
-            # If False, client disconnected, cleanup
-            if message is False:
-                print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
-
+            #we must get a message with keyword DATA or CLOSING prior to any other message
+            keyword_dict = receive_message(notified_socket, HEADER_LENGTH)
+            if( keyword_dict is False):
+                #print('keyword_dict is False')
+                print('During keyword_dict = receive_message, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                 # Remove from list for socket.socket()
                 sockets_list.remove(notified_socket)
 
@@ -117,21 +121,56 @@ while True:
                 del clients[notified_socket]
 
                 continue
+            keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
+            if(keyword_message.upper() == 'CLOSING'):
+                #print('keyword = CLOSING')
+                user = clients[notified_socket]
+                for client_socket in clients:
+                    # But don't sent it to sender
+                    if client_socket != notified_socket:
+                        client_socket.send(user['header'] + user['data'])
+                        client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                
+                notified_socket.send(user['header'] + user['data'])
+                send_ack(notified_socket, 'ACK_CLOSED')
 
-            # Get user by notified socket, so we will know who sent the message
-            user = clients[notified_socket]
+                sockets_list.remove(notified_socket)
 
-            print(f'Received message from {user["data"].decode("utf-8")}: {message["data"].decode("utf-8")}')
+                # Remove from our list of users
+                del clients[notified_socket]
+            elif(keyword_message.upper() == 'DATA'):
+                # Receive message
+                message = receive_message(notified_socket)
 
-            # Iterate over connected clients and broadcast message
-            for client_socket in clients:
+                # If False, client disconnected, cleanup
+                if message is False:
+                    print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
 
-                # But don't sent it to sender
-                if client_socket != notified_socket:
+                    # Remove from list for socket.socket()
+                    sockets_list.remove(notified_socket)
 
-                    # Send user and message (both with their headers)
-                    # We are reusing here message header sent by sender, and saved username header send by user when he connected
-                    client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+                    # Remove from our list of users
+                    del clients[notified_socket]
+
+                    continue
+
+                # Get user by notified socket, so we will know who sent the message
+                user = clients[notified_socket]
+
+                print(f'Received message from {user["data"].decode("utf-8")}: {message["data"].decode("utf-8")}')
+
+                # Iterate over connected clients and broadcast message
+                for client_socket in clients:
+
+                    # But don't sent it to sender
+                    if client_socket != notified_socket:
+
+                        client_socket.send(user['header'] + user['data'])
+                        client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                        # Send user and message (both with their headers)
+                        # We are reusing here message header sent by sender, and saved username header send by user when he connected
+                        #client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+                        client_socket.send(message['header'] + message['data'])
 
     # It's not really necessary to have this, but will handle some socket exceptions just in case
     for notified_socket in exception_sockets:

@@ -108,12 +108,12 @@ def stop_video_comm():
 
     #wait for the send thread to close
     try:
-        while(thread_send_video.is_alive()):
+        while((thread_send_video !=None) and (thread_send_video.is_alive())):
             print('waiting for send thread to become None')
     except Exception as e:
         print('stopped send thread')
 
-    if (videofeed.capture.isOpened()):
+    if((videofeed != None) and (videofeed.capture.isOpened())):
         videofeed.capture.release()
         cv2.destroyWindow(self_username)
 
@@ -122,7 +122,7 @@ def stop_video_comm():
         send('CLOSING')
 
     try:
-        while(thread_listen_video.is_alive()):
+        while((thread_listen_video != None) and (thread_listen_video.is_alive())):
             print('waiting for listen thread to become None')
     except Exception as e:
         print('stopped listen thread')

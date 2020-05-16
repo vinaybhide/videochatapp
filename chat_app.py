@@ -323,8 +323,8 @@ class ChatPage(GridLayout):
         ip = chatapp.connect_page.ip.text
         username = chatapp.connect_page.username.text
 
-        self.is_self_audio_avlbl_avlbl = socket_client_audio.connect(ip, port_audio, username, show_error)
-        if self.is_self_audio_avlbl_avlbl == -1:
+        self.is_self_audio_avlbl = socket_client_audio.connect(ip, port_audio, username, show_error)
+        if self.is_self_audio_avlbl == -1:
             #this means client was not able to connect to server, we will not be able to use video chat at all
             print('socket_client_audio.connect returned -1: Not able to connect to server')
             self.start_audio.set_disabled(False)
@@ -377,7 +377,6 @@ class ChatPage(GridLayout):
             socket_client_video.start_listening(self.callback_listen_video, show_error)
         else:   # self.is_self_video_avlbl == 1:
             #connection is good, we have the self video window and we were able to send our username
-            self.is_self_video_avlbl = True
             self.start_video.set_disabled(True)
             self.stop_video.set_disabled(False)
             socket_client_video.start_listening(self.callback_listen_video, show_error)
@@ -399,6 +398,7 @@ class ChatPage(GridLayout):
         # If there is any message - add it to chat history and send to the server
         if message:
             self.history.update_chat_history(f'[color=dd2020]{chatapp.connect_page.username.text}[/color] > {message}')
+            socket_client_text.send('DATA')
             socket_client_text.send(message)
 
         # As mentioned above, we have to shedule for refocusing to input field
@@ -415,7 +415,8 @@ class ChatPage(GridLayout):
         self.history.update_chat_history(f'[color=20dd20]{username}[/color] > {message}')
 
     def close_app(self, _):
-        socket_client_text.client_socket_text.close()
+        #socket_client_text.client_socket_text.close()
+        socket_client_text.close_connection()
         self.stop_audio_send(_=None)
         self.stop_video_send(_=None)
         #show_error('Exiting App', True)

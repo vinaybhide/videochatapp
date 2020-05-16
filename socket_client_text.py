@@ -55,6 +55,11 @@ def stop_text_comm():
     global stop_connection
 
     stop_connection = True
+
+    #send CLOSING
+    if( client_socket_text != None ):
+        send('CLOSING')
+
     try:
         while(thread_listen_text.is_alive()):
             print('waiting for listen thread to become None')
@@ -72,7 +77,6 @@ def start_listening(incoming_message_callback, error_callback):
 
 # Listens for incomming messages
 def listen(incoming_message_callback, error_callback):
-    global pill_to_kill_send_thread
     # Now we want to loop over received messages (there might be more than one) and print them
     #while True:
     while not pill_to_kill_listen_thread.wait(0):
@@ -90,15 +94,31 @@ def listen(incoming_message_callback, error_callback):
             # Receive and decode username
             username = client_socket_text.recv(username_length).decode('utf-8')
 
-            # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
-            message_header = client_socket_text.recv(HEADER_LENGTH)
-            message_length = int(message_header.decode('utf-8').strip())
-            message = client_socket_text.recv(message_length).decode('utf-8')
+            keyword_header = client_socket_text.recv(HEADER_LENGTH)
+            if not len(keyword_header):
+                #error_callback('Connection closed by the server', False)
+                print('Connection closed by server: client_socket_audio.recv(HEADER_LENGTH)')
+                continue
 
-            # Print message
-            incoming_message_callback(username, message)
-            if(stop_connection == True):
-                pill_to_kill_send_thread.set()
+            # Convert header to int value
+            keyword_length = int(keyword_header.decode('utf-8').strip())
+            keyworkd_message = client_socket_text.recv(keyword_length).decode('utf-8')
+            if(keyworkd_message.upper() == 'CLOSING'):
+                print('received CLOSING message from: '+username)
+            elif(keyworkd_message.upper() == 'ACK_CLOSED'):
+                #print('Stopping listen thread as received ACK_CLOSED message from: '+username)
+                pill_to_kill_listen_thread.set()
+                break                
+            elif(keyworkd_message.upper() == 'DATA'):
+                # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
+                message_header = client_socket_text.recv(HEADER_LENGTH)
+                message_length = int(message_header.decode('utf-8').strip())
+                message = client_socket_text.recv(message_length).decode('utf-8')
+
+                # Print message
+                incoming_message_callback(username, message)
+                #if(stop_connection == True):
+                #    pill_to_kill_listen_thread.set()
 
         except Exception as e:
             # Any other exception - something happened, exit

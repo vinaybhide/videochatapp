@@ -110,7 +110,7 @@ def stop_audio_comm():
 
     #wait for the send thread to close
     try:
-        while(thread_send_audio.is_alive()):
+        while((thread_send_audio != None) and (thread_send_audio.is_alive())):
             print('waiting for send thread to become None')
     except Exception as e:
         print('stopped send thread')
@@ -123,7 +123,7 @@ def stop_audio_comm():
         send('CLOSING')
 
     try:
-        while(thread_listen_audio.is_alive()):
+        while((thread_listen_audio != None) and (thread_listen_audio.is_alive())):
             print('waiting for listen thread to become None')
     except Exception as e:
         print('stopped listen thread')
@@ -235,7 +235,7 @@ def listen(listen_callback, error_callback):
             keyworkd_message = client_socket_audio.recv(keyword_length).decode('utf-8')
 
             if(keyworkd_message.upper() == 'CLOSING'):
-                #print('received CLOSING message from: '+username)
+                print('received CLOSING message from: '+username)
                 """if(audio_out.closed == False):
                     audio_out.close()
                 audio_out = None"""
