@@ -7,8 +7,9 @@ import numpy as np
 
 class VideoFeed:
 
-    def __init__(self,mode=1,name="w1",capture=1):
+    def __init__(self,mode=1,name="w1",capture=1, reduce_size=True):
         #print(name)
+        self.reduce_size = reduce_size
         if mode == 1:
             cv2.startWindowThread() #.StartWindowThread()
             cv2.namedWindow(name, cv2.WINDOW_AUTOSIZE) #.NamedWindow(name, cv2.VideoCapture.CV_WINDOW_AUTOSIZE)
@@ -21,6 +22,8 @@ class VideoFeed:
 
     def get_frame(self):
         ret, self.frame =  self.capture.read() #cv2.QueryFrame(self.capture)
+        if(self.reduce_size == True):
+            self.frame = cv2.resize(self.frame, (0,0), fx = 0.5, fy = 0.5)
         """self.c = cv2.waitKey(1)
         if(self.c=="n"): #in "n" key is pressed while the popup window is in focus
             self.camera_index += 1 #try the next camera index
