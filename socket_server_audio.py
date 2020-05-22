@@ -43,7 +43,7 @@ print(f'Audio chat server: Listening for connections on {IP}:{PORT}...')
 def receive_message(client_socket, receive_size=HEADER_LENGTH):
 
     try:
-        # Receive our "header" containing message length, it's size is defined and constant
+        """# Receive our "header" containing message length, it's size is defined and constant
         message_header = client_socket.recv(receive_size)
 
         # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
@@ -54,8 +54,48 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         message_length = int(message_header.decode('utf-8').strip())
 
         # Return an object of message header and message data
-        return {'header': message_header, 'data': client_socket.recv(message_length)}
+        return {'header': message_header, 'data': client_socket.recv(message_length)}"""
 
+        message_header = ''.encode('utf-8')
+        totrec = 0
+        while totrec<receive_size :
+            chunk = client_socket.recv(receive_size - totrec)
+            #if chunk == '':
+            if chunk is False:
+                print("In receive_message: received 0 bytes during receive of data size.")
+                #raise RuntimeError("Socket connection broken")
+                #break
+                return False
+            totrec += len(chunk)
+            message_header = message_header + chunk
+
+
+        # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
+        if not len(message_header):
+            return False
+
+        # Convert header to int value
+        message_length = int(message_header.decode('utf-8').strip())
+
+        message_data = ''.encode('utf-8')
+        totrec = 0
+        while totrec<message_length :
+            chunk = client_socket.recv(message_length - totrec)
+            #if chunk == '':
+            if chunk is False:
+                print("In receive_message: received 0 bytes during receive of data.")
+                #raise RuntimeError("Socket connection broken")
+                #break
+                return False
+            totrec += len(chunk)
+            message_data = message_data + chunk
+
+        if not len(message_data):
+            return False
+
+        # Return an object of message header and message data
+        #return {'header': message_header, 'data': client_socket.recv(message_length)}
+        return {'header': message_header, 'data': message_data}
     except:
 
         # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
@@ -64,11 +104,21 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         # and that's also a cause when we receive an empty message
         return False
 
+def send_message(client_socket, message_bytes):
+    # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+    send_size = len(message_bytes)
+    tot_sent = 0
+    while tot_sent < send_size:
+        ret = client_socket.send(message_bytes[tot_sent:send_size])
+        tot_sent += ret
+    #client_socket_video.send(message_header + message)
+
 def send_ack(client_socket, message):
     # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
     message = message.encode('utf-8')
     message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-    client_socket.send(message_header + message)
+    #client_socket.send(message_header + message)
+    send_message(client_socket, message_header + message)
 
 def thread_listner(notified_socket):
     while True:
@@ -185,20 +235,24 @@ def thread_listner(notified_socket):
                     client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
                     """ 
                     #print('before send user name: + user[data].decode(utf-8)')
-                    client_socket.send(user['header'] + user['data'])
+                    #client_socket.send(user['header'] + user['data'])
+                    send_message(client_socket, user['header'] + user['data'])
                     #print('before send user name: + user[data].decode(utf-8)')
 
-                    client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                    #client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                    send_message(client_socket, keyword_dict['header'] + keyword_dict['data'])
 
                     #now send the shape of original stream
-                    client_socket.send(shape_size_dict['header'] + shape_size_dict['data'])
+                    #client_socket.send(shape_size_dict['header'] + shape_size_dict['data'])
+                    send_message(client_socket, shape_size_dict['header'] + shape_size_dict['data'])
                     #print('before : client_socket.send(shape_rows_dict, shape_rows_dict')
                     """client_socket.send(shape_rows_dict['header'] + shape_rows_dict['data'])
                     client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])"""
                     #print('after : client_socket.send(shape_cols_dict, shape_cols_dict')
 
                     #send the size of the message
-                    client_socket.send(message_size_dict['header'] + message_size_dict['data'])
+                    #client_socket.send(message_size_dict['header'] + message_size_dict['data'])
+                    send_message(client_socket, message_size_dict['header'] + message_size_dict['data'])
 
                     totalsent = 0
                     while totalsent < message_size :

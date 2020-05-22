@@ -96,11 +96,21 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         # and that's also a cause when we receive an empty message
         return False
 
+def send_message(client_socket, message_bytes):
+    # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+    send_size = len(message_bytes)
+    tot_sent = 0
+    while tot_sent < send_size:
+        ret = client_socket.send(message_bytes[tot_sent:send_size])
+        tot_sent += ret
+    #client_socket_video.send(message_header + message)
+
 def send_ack(client_socket, message):
     # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
     message = message.encode('utf-8')
     message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-    client_socket.send(message_header + message)
+    #client_socket.send(message_header + message)
+    send_message(client_socket, message_header + message)
 
 def thread_listner(notified_socket):
     while True:
@@ -215,19 +225,23 @@ def thread_listner(notified_socket):
                     client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
                     """ 
                     #print('before send user name:' + user['data'].decode('utf-8'))
-                    client_socket.send(user['header'] + user['data'])
+                    #client_socket.send(user['header'] + user['data'])
+                    send_message(client_socket, user['header'] + user['data'])
                     #print('after send user name:' + user['data'].decode('utf-8'))
 
-                    client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                    #client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                    send_message(client_socket, keyword_dict['header'] + keyword_dict['data'])
 
                     #now send the shape of original stream
-                    client_socket.send(shape_size_dict['header'] + shape_size_dict['data'])
+                    #client_socket.send(shape_size_dict['header'] + shape_size_dict['data'])
+                    send_message(client_socket, shape_size_dict['header'] + shape_size_dict['data'])
                     """client_socket.send(shape_rows_dict['header'] + shape_rows_dict['data'])
                     client_socket.send(shape_cols_dict['header'] + shape_cols_dict['data'])
                     client_socket.send(shape_dim_dict['header'] + shape_dim_dict['data'])"""
 
                     #send the size of the message
-                    client_socket.send(message_size_dict['header'] + message_size_dict['data'])
+                    #client_socket.send(message_size_dict['header'] + message_size_dict['data'])
+                    send_message(client_socket, message_size_dict['header'] + message_size_dict['data'])
 
                     totalsent = 0
                     while totalsent < message_size :

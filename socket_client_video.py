@@ -293,7 +293,6 @@ def send_video(send_callback, error_callback):
 
             #now send the entire nparray as bytes
             send_bytes = frame.tobytes()
-            totalsent = 0
             #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
 
             #compress the video bytes - 9 is max compression amd 1 is lowest compression
@@ -303,6 +302,7 @@ def send_video(send_callback, error_callback):
             send_size = len(compressed_send_bytes)
 
             send(str(send_size))
+            totalsent = 0
             while totalsent < send_size :
                 #sent = client_socket_video.send(send_bytes)
                 sent = client_socket_video.send(compressed_send_bytes)
@@ -361,8 +361,8 @@ def listen(listen_callback, error_callback):
     #global videofeed
     global pill_to_kill_listen_thread
     global pill_to_kill_send_thread
-    global thread_listen_video
-    global thread_send_video
+    #global thread_listen_video
+    #global thread_send_video
 
     # Now we want to loop over received messages (there might be more than one) and print them
     #while True:
