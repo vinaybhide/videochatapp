@@ -6,6 +6,7 @@ from videofeed import VideoFeed
 import sounddevice as sd
 import logging
 import numpy as np
+import zlib
 
 HEADER_LENGTH = 10
 NP_ROW_CHARS_SIZE = 10
@@ -61,6 +62,7 @@ def connect(ip, port, my_username, error_callback):
         return -2
 
     set_input_device_options()
+
     audio_in = sd.InputStream(samplerate=44100, dtype='float32')
     audio_in.start()
 
@@ -148,24 +150,34 @@ def send_audio(send_callback, error_callback):
 
             frame, ret = audio_in.read(READ_SIZE)
 
-            shape_row_bytes = (str(frame.shape[0])).encode('utf-8')
+            """shape_row_bytes = (str(frame.shape[0])).encode('utf-8')
             message_header = f"{len(shape_row_bytes):<{NP_ROW_CHARS_SIZE}}".encode('utf-8')
             client_socket_audio.send(message_header + shape_row_bytes)
             #print('after : client_socket_audio.send(message_header + shape_row_bytes)')
             
             shape_col_bytes = (str(frame.shape[1])).encode('utf-8')
             message_header = f"{len(shape_col_bytes):<{NP_COL_CHARS_SIZE}}".encode('utf-8')
-            client_socket_audio.send(message_header + shape_col_bytes)
+            client_socket_audio.send(message_header + shape_col_bytes)"""
             #print('after : client_socket_audio.send(message_header + shape_col_bytes)')
+
+            shape_str = f"{frame.shape[0]},{frame.shape[1]}"
+            shape_str_bytes = shape_str.encode('utf-8')
+            message_header = f"{len(shape_str_bytes):<{HEADER_LENGTH}}".encode('utf-8')
+            client_socket_audio.send(message_header + shape_str_bytes)
 
             #now send the entire nparray as bytes
             send_bytes = frame.tobytes()
             totalsent = 0
-            #send_size = (frame.shape[0] * frame.shape[1])
-            send_size = len(send_bytes)
+    
+            compressed_send_bytes = zlib.compress(send_bytes, 9)
+            
+            #send_size = len(send_bytes)
+            send_size = len(compressed_send_bytes)
+
             send(str(send_size))
             while totalsent < send_size :
-                sent = client_socket_audio.send(send_bytes)
+                #sent = client_socket_audio.send(send_bytes)
+                sent = client_socket_audio.send(compressed_send_bytes)
                 if sent == 0:
                     print("client_socket_audio.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
                     #raise RuntimeError("Socket connection broken")
@@ -246,14 +258,23 @@ def listen(listen_callback, error_callback):
             elif(keyworkd_message.upper() == 'DATA'):
                 #now get the share of nparray. shape is (row, cols, dim) ex. shape: (480, 640, 3)
                 #print('before :client_socket_audio.recv(NP_ROW_CHARS_SIZE)')
-                shape_row_header = client_socket_audio.recv(NP_ROW_CHARS_SIZE)
+
+                shape_size_header = client_socket_audio.recv(HEADER_LENGTH)
+                shape_size_length = int(shape_size_header.decode('utf-8').strip())
+
+                shape_size_str = client_socket_audio.recv(shape_size_length).decode('utf-8')
+                shape_size_split = shape_size_str.split(',')
+                shape_row_int = int(shape_size_split[0])
+                shape_col_int = int(shape_size_split[1])
+
+                """shape_row_header = client_socket_audio.recv(NP_ROW_CHARS_SIZE)
                 shape_row_length = int(shape_row_header.decode('utf-8').strip())
                 shape_row_int = int(client_socket_audio.recv(shape_row_length).decode('utf-8'))
 
                 #print('before :client_socket_audio.recv(NP_COL_CHARS_SIZE)')
                 shape_col_header = client_socket_audio.recv(NP_COL_CHARS_SIZE)
                 shape_col_length = int(shape_col_header.decode('utf-8').strip())
-                shape_col_int = int(client_socket_audio.recv(shape_col_length).decode('utf-8'))
+                shape_col_int = int(client_socket_audio.recv(shape_col_length).decode('utf-8'))"""
 
                 #get the size of the bytes array
                 message_size_header = client_socket_audio.recv(HEADER_LENGTH)
@@ -286,6 +307,7 @@ def listen(listen_callback, error_callback):
                     dtype('uint8')
                 """
                 if(len(frame) > 0):
+                    frame = zlib.decompress(frame)
                     received_nparray = np.frombuffer(frame, dtype=np.float32)
                     received_nparray = received_nparray.reshape(shape_row_int, shape_col_int)
                     audio_out.write(received_nparray)
