@@ -13,14 +13,16 @@ class VideoFeed:
         self.reduce_size = reduce_size
         if mode == 1:
             cv2.startWindowThread() #.StartWindowThread()
-            cv2.namedWindow(name, cv2.WINDOW_AUTOSIZE) #.NamedWindow(name, cv2.VideoCapture.CV_WINDOW_AUTOSIZE)
         self.camera_index = 0
         self.name=name
         if capture == 1:
             self.capture = cv2.VideoCapture(self.camera_index) #.CaptureFromCAM(self.camera_index)
             if not (self.capture.isOpened()):
                 self.capture.release()
-                cv2.destroyWindow(name)
+                #cv2.destroyWindow(name)
+            else:
+                cv2.namedWindow(name, cv2.WINDOW_AUTOSIZE) #.NamedWindow(name, cv2.VideoCapture.CV_WINDOW_AUTOSIZE)
+
 
     def get_frame(self):
         ret, self.frame =  self.capture.read() #cv2.QueryFrame(self.capture)

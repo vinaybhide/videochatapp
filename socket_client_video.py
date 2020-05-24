@@ -23,6 +23,7 @@ stop_connection = False
 
 videofeed = None
 self_username = ''
+window_list = []
 
 #currently this is getting called from ConnectPage. 
 # But i think this needs to get called from 'Start Video' button. Will need to check this logic
@@ -196,7 +197,7 @@ def stop_video_comm():
         print('stopped listen thread')
 
     print('video listen thread stopped')
-    cv2.destroyAllWindows()
+    #cv2.destroyAllWindows()
 
 def stop_video_comm1():
     #stop_send_thread()
@@ -366,6 +367,7 @@ def listen(listen_callback, error_callback):
     #global videofeed
     global pill_to_kill_listen_thread
     global pill_to_kill_send_thread
+    global window_list
     #global thread_listen_video
     #global thread_send_video
 
@@ -419,9 +421,14 @@ def listen(listen_callback, error_callback):
 
             if(keyworkd_message.upper() == 'CLOSING'):
                 #we need to close the video window of the specific sender
-                if(cv2.getWindowProperty(username + '_receiver', 0) == 0):
+                #if(cv2.getWindowProperty(username + '_receiver', 0) == 0):
+                if (username + '_receiver') in window_list:
+                    window_list.remove(username + '_receiver')
                     cv2.destroyWindow(username + '_receiver')
             elif(keyworkd_message.upper() == 'ACK_CLOSED'):
+                for each_window in window_list:
+                    cv2.destroyWindow(each_window)
+                window_list.clear()
                 pill_to_kill_listen_thread.set()
                 break
             elif(keyworkd_message.upper() == 'DATA'):
@@ -506,11 +513,15 @@ def listen(listen_callback, error_callback):
 
                     # Now create OpenCV window for this username if not already created
                     #if(cv2.getWindowProperty(username + '_receiver', 0) < 0):
+                    #if( cv2.getWindowProperty(username + '_receiver',cv2.WND_PROP_VISIBLE) <= 0):
                         #print('cv2.getWindowProperty < 0')
-                    cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
+                        #cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
                     #print('after cv2.namedWindow(username + \'_receiver\'')
-                
-                    x = cv2.waitKey(1)
+
+                    if (username + '_receiver') not in window_list:
+                        window_list.append(username + '_receiver')
+                        cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
+
                     cv2.imshow(username + '_receiver', received_nparray)
                     x = cv2.waitKey(1)
                     #print('after cv2.imshow(username + \'_receiver\'')
