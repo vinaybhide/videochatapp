@@ -507,12 +507,12 @@ def listen(listen_callback, error_callback):
                     # Now create OpenCV window for this username if not already created
                     #if(cv2.getWindowProperty(username + '_receiver', 0) < 0):
                         #print('cv2.getWindowProperty < 0')
-                cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
+                    cv2.namedWindow(username + '_receiver', cv2.WINDOW_AUTOSIZE)
                     #print('after cv2.namedWindow(username + \'_receiver\'')
                 
-                cv2.imshow(username + '_receiver', received_nparray)
-                x = cv2.waitKey(1)
-                cv2.getwindow
+                    x = cv2.waitKey(1)
+                    cv2.imshow(username + '_receiver', received_nparray)
+                    x = cv2.waitKey(1)
                     #print('after cv2.imshow(username + \'_receiver\'')
         except Exception as e:
             # Any other exception - something happened, exit
