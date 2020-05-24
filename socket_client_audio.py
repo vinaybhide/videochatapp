@@ -1,10 +1,11 @@
+#v0.8
 #import socket, videosocket
 import socket
 import errno
 from threading import Thread, Event
-from videofeed import VideoFeed
+#from videofeed import VideoFeed
 import sounddevice as sd
-import logging
+#import logging
 import numpy as np
 import zlib
 
@@ -23,7 +24,7 @@ pill_to_kill_listen_thread = None
 stop_connection = False
 
 # Connects to the server
-def connect(ip, port, my_username, error_callback):
+def connect(ip, port, my_username, input_device_dict, output_device_dict, error_callback):
     global client_socket_audio
     global self_username
     global audio_in
@@ -63,11 +64,12 @@ def connect(ip, port, my_username, error_callback):
 
     set_input_device_options()
 
-    audio_in = sd.InputStream(samplerate=44100, dtype='float32')
+    #audio_in = sd.InputStream(samplerate=44100, dtype='float32')
+    audio_in = sd.InputStream(samplerate=int(input_device_dict['default_samplerate']), dtype='float32')
     audio_in.start()
 
     set_output_device_options()
-    audio_out = sd.OutputStream(samplerate=44100, dtype='float32')
+    audio_out = sd.OutputStream(samplerate=int(output_device_dict['default_samplerate']), dtype='float32')
     audio_out.start()
 
     """audio_in = sd.InputStream(samplerate=44100, dtype='float32')

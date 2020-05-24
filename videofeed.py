@@ -1,3 +1,4 @@
+#v0.8
 import cv2
 
 #from PIL import Image
@@ -18,6 +19,7 @@ class VideoFeed:
         if capture == 1:
             self.capture = cv2.VideoCapture(self.camera_index) #.CaptureFromCAM(self.camera_index)
             if not (self.capture.isOpened()):
+                self.capture.release()
                 cv2.destroyWindow(name)
 
     def get_frame(self):
@@ -70,6 +72,7 @@ class VideoFeed:
         #cv2.imshow(self.name, cv_im)
         #cv2.imshow(self.name, img)
         cv2.imshow(self.name, frame)
+        x = cv2.waitKey(1)
 
 if __name__=="__main__":
     vf = VideoFeed(1,"test",1)

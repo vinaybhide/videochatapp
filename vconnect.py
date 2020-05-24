@@ -1,8 +1,12 @@
+#v0.8
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox as msgbx
 import os.path as ospath
 import socket_client_text, socket_client_video, socket_client_audio
+import cv2
+import sounddevice as sd
+from threading import Thread
 
 class vConnectApp():
     def __init__(self):
@@ -11,9 +15,16 @@ class vConnectApp():
         self.root = Tk()
         self.root.wm_state('normal')
         self.root.wm_title("vConnect-Text, Audio and Video")
-        self.root.resizable(width=False, height=False)
+        #self.root.resizable(width=True, height=False)
 
         self.root.wm_protocol("WM_DELETE_WINDOW", self.close_app)
+
+        #configure device variables
+        self.audioin = None
+        self.audioout = None
+        self.is_test_audio_clicked = False
+        self.is_test_video_clicked = False
+        ####
 
         self.is_self_audio_avlbl = False
         self.is_self_video_avlbl = False
@@ -35,16 +46,33 @@ class vConnectApp():
 
         #self.content = ttk.Frame(self.root, padding=(5, 5, 12, 0))
         self.content = ttk.Frame(self.root)
-        self.content.grid(column=0, row=0, sticky=(N, S, E, W))
 
         self.notebook = ttk.Notebook(self.content)
-        self.fConnectPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken", padding=5)
+        self.fConfigurePage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")#, padding=5)
+        self.fConnectPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")#, padding=5)
         self.fInfoPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")
         self.fChatPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")
 
+        self.notebook.add(self.fConfigurePage, text='Configure Devices')
         self.notebook.add(self.fConnectPage, text='Connect')
         self.notebook.add(self.fChatPage, text = 'Chat')
         self.notebook.add(self.fInfoPage, text='Information')
+
+        #create configure device fields
+        self.frame_configure = ttk.Frame(self.fConfigurePage) #, borderwidth=5, relief="sunken")
+        self.video_select_label = ttk.Label(self.frame_configure, text='Click the button to test video: ')
+        self.btn_video_test = ttk.Button(self.frame_configure, text="Test Video", command=self.test_video)
+
+        #self.frame_audio_config = ttk.Frame(self.fConfigurePage) #, borderwidth=5, relief="sunken")
+        self.speaker_select_label = ttk.Label(self.frame_configure, text='Selected speaker: ')
+        self.speaker_select_text = StringVar(value='')
+        self.speaker_select_entry = ttk.Entry(self.frame_configure, textvariable=self.speaker_select_text, width=60)
+
+        self.mic_select_label = ttk.Label(self.frame_configure, text='Selected Microphone: ')
+        self.mic_select_text = StringVar(value='')
+        self.mic_select_entry = ttk.Entry(self.frame_configure, textvariable=self.mic_select_text, width=60)
+        self.btn_audio_test = ttk.Button(self.frame_configure, text="Test Audio", command=self.test_audio)
+
 
         #create Connect Page fields
         self.frame_connect_details = ttk.Frame(self.fConnectPage) #, borderwidth=5, relief="sunken")
@@ -74,7 +102,7 @@ class vConnectApp():
         #create Information Page fields
         self.frame_info_label = ttk.Frame(self.fInfoPage)#, borderwidth=5, relief="sunken")
         self.vscroll_info_message = Scrollbar(self.frame_info_label)
-        self.info_message_text = Text(self.frame_info_label, yscrollcommand=self.vscroll_info_message.set, state=DISABLED, height=30, width=90) #DISABLED
+        self.info_message_text = Text(self.frame_info_label, yscrollcommand=self.vscroll_info_message.set, state=DISABLED)#, height=30, width=90) #DISABLED
         self.vscroll_info_message.config(command=self.info_message_text.yview)
 
         #Create Chat Page fields
@@ -104,45 +132,158 @@ class vConnectApp():
 
         #put everything on grid
 
+        self.content.grid(column=0, row=0, sticky=(N, S, E, W))
         self.notebook.grid(row=0, column=0, sticky=(N, E, S, W), padx=5, pady=5) 
         
-        #Connect page
-        self.frame_connect_details.grid(row=5, column=0, sticky=(N, S, E, W), padx=200, pady=100)
-        self.ip_label.grid(row=0, column=2, padx=2, pady=2, sticky=(E, N))
-        self.ip_entry.grid(row=0, column=3, padx=2, pady=2, sticky=(W))
-        self.port_text_label.grid(row=1, column=2, padx=2, pady=2, sticky=(E, N))
-        self.port_text_entry.grid(row=1, column=3, padx=2, pady=2, sticky=(W))
-        self.port_video_label.grid(row=2, column=2, padx=2, pady=2, sticky=(E, N))
-        self.port_video_entry.grid(row=2, column=3, padx=2, pady=2, sticky=(W))
-        self.port_audio_label.grid(row=3, column=2, padx=2, pady=2, sticky=(E, N))
-        self.port_audio_entry.grid(row=3, column=3, padx=2, pady=2, sticky=(W))
-        self.username_label.grid(row=4, column=2, padx=2, pady=2, sticky=(E, N))
-        self.username_entry.grid(row=4, column=3, padx=2, pady=2, sticky=(W))
+        #configure page
+        self.frame_configure.grid(column=3, row=1, sticky=(N, S, E, W), padx=5, pady=5)
+        self.video_select_label.grid(column=0, row=0, padx=2, pady=2, sticky=(N, E))
+        self.btn_video_test.grid(column=1, row=0, padx=2, pady=2, sticky=(N, W))
 
-        self.btn_join.grid(row=5, column=4, padx=5, pady=5)
+        #self.frame_audio_config.grid(column=0, row=1, sticky=(N, S, E, W), padx=5, pady=5)
+        self.speaker_select_label.grid(column=0, row=1, padx=2, pady=2, sticky=(N, E))
+        self.speaker_select_entry.grid(column=1, row=1, padx=2, pady=2, sticky=(N, E, W))
+        self.mic_select_label.grid(column=0, row=2, padx=2, pady=2, sticky=(N, E))
+        self.mic_select_entry.grid(column=1, row=2, padx=2, pady=2, sticky=(N, E, W))
+        self.btn_audio_test.grid(column=1, row=3, padx=2, pady=2, sticky=(N, W))
+
+
+        #Connect page
+        self.frame_connect_details.grid(row=3, column=1, sticky=(N, S, E, W), padx=5, pady=5)
+        self.ip_label.grid(row=0, column=2, padx=2, pady=2, sticky=(N, E))
+        self.ip_entry.grid(row=0, column=3, padx=2, pady=2, sticky=(N, E, W))
+        self.port_text_label.grid(row=1, column=2, padx=2, pady=2, sticky=(N, E))
+        self.port_text_entry.grid(row=1, column=3, padx=2, pady=2, sticky=(N, E, W))
+        self.port_video_label.grid(row=2, column=2, padx=2, pady=2, sticky=(N, E))
+        self.port_video_entry.grid(row=2, column=3, padx=2, pady=2, sticky=(N, E, W))
+        self.port_audio_label.grid(row=3, column=2, padx=2, pady=2, sticky=(N, E))
+        self.port_audio_entry.grid(row=3, column=3, padx=2, pady=2, sticky=(N, E, W))
+        self.username_label.grid(row=4, column=2, padx=2, pady=2, sticky=(N, E))
+        self.username_entry.grid(row=4, column=3, padx=2, pady=2, sticky=(N, E, W))
+
+        self.btn_join.grid(row=5, column=3, padx=5, pady=5)
 
         #info page
         self.frame_info_label.grid(row=0, column=0, sticky=(N, E, S, W), padx=5, pady=5)
-        self.info_message_text.grid(row=0, column=0, padx=2, pady=2, sticky=(W))
+        self.info_message_text.grid(row=0, column=0, padx=2, pady=2, sticky=(N, E, W))
         self.vscroll_info_message.grid(row=0, column=1, sticky=(N,S))
 
         #chat page
         self.frame_chat_history.grid(row=0, column=0, sticky=(N, E, S, W), padx=5, pady=5)
-        self.chat_history_text.grid(row=0, column=0, padx=2, pady=2, sticky=(W))
+        self.chat_history_text.grid(row=0, column=0, padx=2, pady=2, sticky=(N, E, W))
         self.vscroll_chat_history.grid(row=0, column=1, sticky=(N,S))
 
         self.frame_new_message.grid(row=1, column=0, padx=5, pady=5, sticky=(N, E, S, W) )
-        self.new_message_entry.grid(row=0, column=0, padx=2, pady=2, sticky=(W))
+        self.new_message_entry.grid(row=0, column=0, padx=2, pady=2, sticky=(N, E, W))
         self.btn_send.grid(row=0, column=1, padx=2, pady=2)
 
         self.frame_command_btn.grid(row=2, column=0, sticky=(N, E, S, W), padx=5, pady=5)
-        self.btn_start_video.grid(row=0, column=4, padx=30, pady=2)
+        self.btn_start_video.grid(row=0, column=4, padx=20, pady=2)
         self.btn_stop_video.grid(row=0, column=5, padx=2, pady=2)
-        self.btn_start_audio.grid(row=0, column=6, padx=30, pady=2)
+        self.btn_start_audio.grid(row=0, column=6, padx=20, pady=2)
         self.btn_stop_audio.grid(row=0, column=7, padx=2, pady=2)
-        self.btn_close_app.grid(row=0, column=8, padx=50, pady=2)
+        self.btn_close_app.grid(row=0, column=8, padx=20, pady=2)
 
-        self.notebook.tab(1, state=DISABLED)
+
+        #make resize %
+        #now set resize
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+
+        self.content.columnconfigure(0, weight=3)
+        self.content.columnconfigure(1, weight=3)
+        self.content.columnconfigure(2, weight=3)
+        self.content.columnconfigure(3, weight=1)
+        self.content.columnconfigure(4, weight=3)
+
+        self.content.rowconfigure(0, weight=3)
+        self.content.rowconfigure(1, weight=3)
+        self.content.rowconfigure(2, weight=3)
+        self.content.rowconfigure(3, weight=3)
+        self.content.rowconfigure(4, weight=3)
+        self.content.rowconfigure(5, weight=3)
+
+        self.fConfigurePage.columnconfigure(0, weight=3)
+        self.fConfigurePage.columnconfigure(1, weight=3)
+
+        self.fConfigurePage.rowconfigure(0, weight=1)
+        self.fConfigurePage.rowconfigure(1, weight=1)
+        self.fConfigurePage.rowconfigure(2, weight=1)
+
+        self.frame_configure.columnconfigure(0, weight=1)
+        self.frame_configure.columnconfigure(1, weight=1)
+
+        self.frame_configure.rowconfigure(0, weight=1)
+        self.frame_configure.rowconfigure(1, weight=1)
+        self.frame_configure.rowconfigure(2, weight=1)
+
+
+        self.fConnectPage.columnconfigure(0, weight=3)
+        self.fConnectPage.columnconfigure(1, weight=3)
+        self.fConnectPage.columnconfigure(2, weight=3)
+        self.fConnectPage.columnconfigure(3, weight=1)
+        self.fConnectPage.columnconfigure(4, weight=3)
+
+        self.fConnectPage.rowconfigure(0, weight=3)
+        self.fConnectPage.rowconfigure(1, weight=3)
+        self.fConnectPage.rowconfigure(2, weight=3)
+        self.fConnectPage.rowconfigure(3, weight=3)
+        self.fConnectPage.rowconfigure(4, weight=3)
+        self.fConnectPage.rowconfigure(5, weight=3)
+
+        self.frame_connect_details.columnconfigure(0, weight=3)
+        self.frame_connect_details.columnconfigure(1, weight=3)
+        self.frame_connect_details.columnconfigure(2, weight=3)
+        self.frame_connect_details.columnconfigure(3, weight=1)
+        self.frame_connect_details.columnconfigure(4, weight=3)
+
+        self.frame_connect_details.rowconfigure(0, weight=3)
+        self.frame_connect_details.rowconfigure(1, weight=3)
+        self.frame_connect_details.rowconfigure(2, weight=3)
+        self.frame_connect_details.rowconfigure(3, weight=3)
+        self.frame_connect_details.rowconfigure(4, weight=3)
+        self.frame_connect_details.rowconfigure(5, weight=3)
+
+        self.fInfoPage.columnconfigure(0, weight=10)
+        self.fInfoPage.columnconfigure(1, weight=0)
+        self.fInfoPage.rowconfigure(0, weight=3)
+
+        self.frame_info_label.columnconfigure(0, weight=10)
+        self.frame_info_label.columnconfigure(1, weight=0)
+        self.frame_info_label.rowconfigure(0, weight=3)
+
+        self.fChatPage.columnconfigure(0, weight=3)
+        self.fChatPage.columnconfigure(1, weight=0)
+        self.fChatPage.rowconfigure(0, weight=10)
+        self.fChatPage.rowconfigure(1, weight=0)
+        self.fChatPage.rowconfigure(2, weight=0)
+
+        self.frame_chat_history.columnconfigure(0, weight=3)
+        self.frame_chat_history.columnconfigure(1, weight=0)
+        self.frame_chat_history.rowconfigure(0, weight=1)
+
+        self.frame_new_message.columnconfigure(0, weight=3)
+        self.frame_new_message.columnconfigure(1, weight=0)
+        self.frame_new_message.rowconfigure(0, weight=1)
+
+        self.frame_command_btn.columnconfigure(0, weight=1)
+        self.frame_command_btn.columnconfigure(1, weight=1)
+        self.frame_command_btn.columnconfigure(2, weight=1)
+        self.frame_command_btn.columnconfigure(3, weight=1)
+        self.frame_command_btn.columnconfigure(4, weight=1)
+        self.frame_command_btn.columnconfigure(5, weight=1)
+        self.frame_command_btn.columnconfigure(6, weight=1)
+        self.frame_command_btn.columnconfigure(7, weight=1)
+        self.frame_command_btn.columnconfigure(8, weight=1)
+        self.frame_command_btn.rowconfigure(0, weight=1)
+
+
+        self.speaker_dict = self.get_speaker_list()
+        self.speaker_select_text.set(self.speaker_dict['name'])
+        self.mic_dict = self.get_mic_list()
+        self.mic_select_text.set(self.mic_dict['name'])
+
+        self.notebook.tab(2, state=DISABLED)
 
         mainloop()
 
@@ -153,6 +294,85 @@ class vConnectApp():
         self.stop_audio_send()
         self.stop_video_send()
         self.root.destroy()
+
+    #following is the content of device_dict 
+    """'name':'Speakers (Realtek High Definiti'
+    'hostapi':0
+    'max_input_channels':0
+    'max_output_channels':2
+    'default_low_input_latency':0.09
+    'default_low_output_latency':0.09
+    'default_high_input_latency':0.18
+    'default_high_output_latency':0.18
+    'default_samplerate':44100.0"""
+
+    def get_speaker_list(self):
+        device_dict = sd.query_devices(kind='output')
+        return device_dict
+
+    def get_mic_list(self):
+        device_dict = sd.query_devices(kind='input')
+        return device_dict
+
+    def test_video(self):
+        if(self.is_test_video_clicked == False):
+            self.is_test_video_clicked = True
+
+            self.btn_video_test.configure(text='Stop Video Test')
+
+            thread_start_show_video = Thread(target=self.show_video)
+            thread_start_show_video.start()
+
+        else:
+            self.is_test_video_clicked = False
+            self.btn_video_test.configure(text='Test Video')
+
+    def show_video(self):
+        cv2.namedWindow('Test Video', cv2.WINDOW_AUTOSIZE) #.NamedWindow(name, cv2.VideoCapture.CV_WINDOW_AUTOSIZE)
+        capture = cv2.VideoCapture(0) #.CaptureFromCAM(self.camera_index)
+        if not (capture.isOpened()):
+            cv2.destroyWindow('Test Video')
+            print('No Camera found')
+        else:
+            while (self.is_test_video_clicked == True):
+                ret, frame =  capture.read() #cv2.QueryFrame(self.capture)
+                frame = cv2.resize(frame, (0,0), fx = 0.5, fy = 0.5)
+                cv2.imshow('Test Video', frame)
+                x = cv2.waitKey(1)
+
+            capture.release()
+            cv2.destroyAllWindows()
+
+
+    def test_audio(self):
+        if(self.is_test_audio_clicked == False):
+            self.audioin = sd.InputStream(samplerate=int(self.mic_dict['default_samplerate']),dtype='float32')
+            self.audioout = sd.OutputStream(samplerate=int(self.speaker_dict['default_samplerate']),dtype='float32')        
+
+            self.is_test_audio_clicked = True
+
+            thread_start_recording = Thread(target=self.record_audio)
+            thread_start_recording.start()
+
+            self.btn_audio_test.configure(text='Stop Audio Test')
+        else:
+            self.is_test_audio_clicked = False
+            self.btn_audio_test.configure(text='Test Audio')
+
+    def record_audio(self):
+        self.audioin.start()
+        self.audioout.start()
+        frame = None
+        while (self.is_test_audio_clicked == True):
+            frame, ret = self.audioin.read(1000)
+            #sd.sleep(int(1000))
+            self.audioout.write(frame)
+
+        self.audioin.abort()
+        self.audioout.abort()
+
+        self.audioin = None
+        self.audioout = None
 
     def join_button(self):
         port_text = self.port_text_text.get()
@@ -170,8 +390,8 @@ class vConnectApp():
         self.info_message_text.configure(state=NORMAL)
         self.info_message_text.insert(END, f"Attempting to join {ip}: text port={port_text} videoport={port_video} audioport={port_audio} as {username}" + '\n')
         self.info_message_text.configure(state=DISABLED)
-        self.notebook.tab(2, state='normal')
-        self.notebook.select(2)
+        self.notebook.tab(3, state='normal')
+        self.notebook.select(3)
         self.connect()
 
     def connect(self):
@@ -187,8 +407,8 @@ class vConnectApp():
         #start the text communication right away
         socket_client_text.start_listening(self.incoming_message, self.show_error)
 
-        self.notebook.tab(1, state='normal')
-        self.notebook.select(1)
+        self.notebook.tab(2, state='normal')
+        self.notebook.select(2)
 
         """In the following example, the resulting text is blue on a yellow background.
             text.tag_config("n", background="yellow", foreground="red")
@@ -215,13 +435,13 @@ class vConnectApp():
         self.info_message_text.configure(state=NORMAL)
         self.info_message_text.insert(END, message + '\n')
         self.info_message_text.configure(state=DISABLED)
-        self.notebook.tab(2, state='normal')
-        self.notebook.select(2)
+        self.notebook.tab(3, state='normal')
+        self.notebook.select(3)
         if(exit_flag):
             self.close_app()
         else:
-            self.notebook.tab(1, state='normal')
-            self.notebook.select(1)
+            self.notebook.tab(2, state='normal')
+            self.notebook.select(2)
 
     def send_text_message_on_enter(self, evnt):
         self.send_text_message()
@@ -246,7 +466,7 @@ class vConnectApp():
         ip = self.ip_text.get()
         username = self.username_text.get()
 
-        self.is_self_audio_avlbl = socket_client_audio.connect(ip, port_audio, username, self.show_error)
+        self.is_self_audio_avlbl = socket_client_audio.connect(ip, port_audio, username, self.speaker_dict, self.mic_dict, self.show_error)
         if self.is_self_audio_avlbl == -1:
             #this means client was not able to connect to server, we will not be able to use video chat at all
             print('socket_client_audio.connect returned -1: Not able to connect to server')

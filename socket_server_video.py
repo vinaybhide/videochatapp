@@ -1,3 +1,4 @@
+#v0.8
 import socket
 import select
 from threading import Thread
@@ -118,28 +119,32 @@ def thread_listner(notified_socket):
         if( keyword_dict is False):
             print('keyword_dict is False, continuing...')
             continue
-            print('keyword_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+            """ print('keyword_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
             # Remove from list for socket.socket()
             sockets_list.remove(notified_socket)
 
             # Remove from our list of users
             del clients[notified_socket]
 
-            break
+            break"""
         keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
         if(keyword_message.upper() == 'CLOSING'):
             user = clients[notified_socket]
             for client_socket in clients:
                 # But don't sent it to sender
-                if client_socket != notified_socket:
+                if ((client_socket != notified_socket) and (clients[client_socket] != None)):
                     client_socket.send(user['header'] + user['data'])
                     client_socket.send(keyword_dict['header'] + keyword_dict['data'])
             notified_socket.send(user['header'] + user['data'])
             send_ack(notified_socket, 'ACK_CLOSED')
 
             sockets_list.remove(notified_socket)
-            # Remove from our list of users
-            del clients[notified_socket]
+            # Remove from our list of users - 
+            # commenting following as it raises exception - runtimeerror dictionary changed size during iteration
+            #del clients[notified_socket]
+            #instead we will set that particular entry to None and out of the loop we will delete that entry
+            print('Closed connection from: {}'.format(user['data'].decode('utf-8')))
+            clients[notified_socket] = None
             break
         elif(keyword_message.upper() == 'DATA'):
             #firsr we need to get the shape of the stream
@@ -171,14 +176,14 @@ def thread_listner(notified_socket):
                 print('message_size_dict is False, continuing...')
                 continue
 
-                print('message_size_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                """ print('message_size_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                 # Remove from list for socket.socket()
                 sockets_list.remove(notified_socket)
 
                 # Remove from our list of users
                 del clients[notified_socket]
 
-                break
+                break"""
 
             message_size = int((message_size_dict['data'].decode('utf-8')).strip())
             
@@ -199,25 +204,30 @@ def thread_listner(notified_socket):
             if message is False:
                 print('message is False, continuing...')
                 continue
-                print('message is False:, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                """print('message is False:, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                 # Remove from list for socket.socket()
                 sockets_list.remove(notified_socket)
 
                 # Remove from our list of users
                 del clients[notified_socket]
 
-                break
+                break"""
 
             # Get user by notified socket, so we will know who sent the message
             user = clients[notified_socket]
 
+            if(user == None):
+                print("client disconnected, stoping the thread listner")
+                break
             #print(f'Received message from {user["data"].decode("utf-8")}') #': {message["data"].decode("utf-8")}')
 
             # Iterate over connected clients and broadcast message
+            #key_copy = tuple(clients.keys())
             for client_socket in clients:
+            #for k in key_copy:
 
                 # But don't sent it to sender
-                if client_socket != notified_socket:
+                if ((client_socket != notified_socket) and (clients[client_socket] != None)):
                     # Text code - keeping for reference
                     """
                     # Send user and message (both with their headers)

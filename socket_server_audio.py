@@ -1,3 +1,4 @@
+#v0.8
 import socket
 import select
 from threading import Thread
@@ -126,21 +127,21 @@ def thread_listner(notified_socket):
         if( keyword_dict is False):
             print('keyword_dict is False, continuing...')
             continue
-            print('During keyword_dict = receive_message, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+            """print('During keyword_dict = receive_message, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
             # Remove from list for socket.socket()
             sockets_list.remove(notified_socket)
 
             # Remove from our list of users
             del clients[notified_socket]
 
-            continue
+            continue"""
         keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
         if(keyword_message.upper() == 'CLOSING'):
             #print('keyword = CLOSING')
             user = clients[notified_socket]
             for client_socket in clients:
                 # But don't sent it to sender
-                if client_socket != notified_socket:
+                if ((client_socket != notified_socket) and (clients[client_socket] != None)):
                     client_socket.send(user['header'] + user['data'])
                     client_socket.send(keyword_dict['header'] + keyword_dict['data'])
             
@@ -150,8 +151,12 @@ def thread_listner(notified_socket):
             sockets_list.remove(notified_socket)
 
             # Remove from our list of users
-            del clients[notified_socket]
-
+            # commenting following as it raises exception - runtimeerror dictionary changed size during iteration
+            #del clients[notified_socket]
+            #instead we will set that particular entry to None and out of the loop we will delete that entry
+            print('Closed connection from: {}'.format(user['data'].decode('utf-8')))
+            clients[notified_socket] = None
+            break
         elif(keyword_message.upper() == 'DATA'):
             #firsr we need to get the shape of the stream
             #first we get the rows
@@ -181,14 +186,14 @@ def thread_listner(notified_socket):
             if(message_size_dict is False):
                 print('message_size_dict is False, continuing...')
                 continue
-                print('message_size_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                """print('message_size_dict is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
                 # Remove from list for socket.socket()
                 sockets_list.remove(notified_socket)
 
                 # Remove from our list of users
                 del clients[notified_socket]
 
-                continue
+                continue"""
 
             message_size = int((message_size_dict['data'].decode('utf-8')).strip())
             #print('after message size decode:' + str(message_size))
@@ -208,7 +213,7 @@ def thread_listner(notified_socket):
             if message is False:
                 print('message is False, continuing...')
                 continue
-                print('Audio message is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+                """print('Audio message is False, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
 
                 # Remove from list for socket.socket()
                 sockets_list.remove(notified_socket)
@@ -216,10 +221,13 @@ def thread_listner(notified_socket):
                 # Remove from our list of users
                 del clients[notified_socket]
 
-                continue
+                continue"""
 
             # Get user by notified socket, so we will know who sent the message
             user = clients[notified_socket]
+            if(user == None):
+                print("client disconnected, stoping the thread listner")
+                break
 
             #print(f'Received message from {user["data"].decode("utf-8")}') #': {message["data"].decode("utf-8")}')
 
@@ -227,7 +235,7 @@ def thread_listner(notified_socket):
             for client_socket in clients:
 
                 # But don't sent it to sender
-                if client_socket != notified_socket:
+                if ((client_socket != notified_socket) and (clients[client_socket] != None)):
                     # Text code - keeping for reference
                     """
                     # Send user and message (both with their headers)

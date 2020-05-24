@@ -1,3 +1,4 @@
+#v0.8
 #import socket, videosocket
 import socket
 import errno
@@ -73,6 +74,7 @@ def connect(ip, port, my_username, error_callback):
         videofeed = VideoFeed(1,my_username,1)
        
         if not (videofeed.capture.isOpened()):
+            videofeed = None
             print('Can not open self capture camera')
             pill_to_kill_listen_thread = Event()
             return -3
@@ -177,6 +179,8 @@ def stop_video_comm():
     except Exception as e:
         print('stopped send thread')
 
+    print('video send thread stopped')
+
     if((videofeed != None) and (videofeed.capture.isOpened())):
         videofeed.capture.release()
         cv2.destroyWindow(self_username)
@@ -191,6 +195,7 @@ def stop_video_comm():
     except Exception as e:
         print('stopped listen thread')
 
+    print('video listen thread stopped')
     cv2.destroyAllWindows()
 
 def stop_video_comm1():
@@ -507,6 +512,7 @@ def listen(listen_callback, error_callback):
                 
                 cv2.imshow(username + '_receiver', received_nparray)
                 x = cv2.waitKey(1)
+                cv2.getwindow
                     #print('after cv2.imshow(username + \'_receiver\'')
         except Exception as e:
             # Any other exception - something happened, exit

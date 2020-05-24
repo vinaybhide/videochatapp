@@ -1,3 +1,4 @@
+#v0.8
 import socket
 import errno
 from threading import Thread, Event
@@ -61,7 +62,7 @@ def stop_text_comm():
         send('CLOSING')
 
     try:
-        while(thread_listen_text.is_alive()):
+        while((thread_listen_text !=None) and (thread_listen_text.is_alive())):
             print('waiting for listen thread to become None')
     except Exception as e:
         print('stopped listen thread')
