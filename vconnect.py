@@ -283,6 +283,11 @@ class vConnectApp():
         self.mic_dict = self.get_mic_list()
         self.mic_select_text.set(self.mic_dict['name'])
 
+        self.info_message_text.configure(state=NORMAL)
+        self.info_message_text.insert(END, f"Input Device Properties:" + '\n' +f'{self.mic_dict}'+ '\n')
+        self.info_message_text.insert(END, f"Output Device Properties:" + '\n' +f'{self.speaker_dict}'+ '\n')
+        self.info_message_text.configure(state=DISABLED)
+
         self.notebook.tab(2, state=DISABLED)
 
         mainloop()
@@ -346,8 +351,8 @@ class vConnectApp():
 
     def test_audio(self):
         if(self.is_test_audio_clicked == False):
-            self.audioin = sd.InputStream(samplerate=int(self.mic_dict['default_samplerate']),dtype='float32')
-            self.audioout = sd.OutputStream(samplerate=int(self.speaker_dict['default_samplerate']),dtype='float32')        
+            self.audioin = sd.InputStream(samplerate=int(self.mic_dict['default_samplerate']), blocksize=2048, dtype='float32')
+            self.audioout = sd.OutputStream(samplerate=int(self.speaker_dict['default_samplerate']),blocksize=2048, dtype='float32')        
 
             self.is_test_audio_clicked = True
 
@@ -364,7 +369,7 @@ class vConnectApp():
         self.audioout.start()
         frame = None
         while (self.is_test_audio_clicked == True):
-            frame, ret = self.audioin.read(1000)
+            frame, ret = self.audioin.read(2048)
             #sd.sleep(int(1000))
             self.audioout.write(frame)
 

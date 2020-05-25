@@ -12,7 +12,7 @@ import zlib
 HEADER_LENGTH = 10
 NP_ROW_CHARS_SIZE = 10
 NP_COL_CHARS_SIZE = 4
-READ_SIZE = 1000
+READ_SIZE = 2048
 client_socket_audio = None
 audio_in = None
 audio_out = None
@@ -65,11 +65,11 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, error_
     set_input_device_options()
 
     #audio_in = sd.InputStream(samplerate=44100, dtype='float32')
-    audio_in = sd.InputStream(samplerate=int(input_device_dict['default_samplerate']), dtype='float32')
+    audio_in = sd.InputStream(samplerate=float(input_device_dict['default_samplerate']), blocksize=READ_SIZE, dtype='float32')
     audio_in.start()
 
     set_output_device_options()
-    audio_out = sd.OutputStream(samplerate=int(output_device_dict['default_samplerate']), dtype='float32')
+    audio_out = sd.OutputStream(samplerate=float(output_device_dict['default_samplerate']), blocksize=READ_SIZE, dtype='float32')
     audio_out.start()
 
     """audio_in = sd.InputStream(samplerate=44100, dtype='float32')

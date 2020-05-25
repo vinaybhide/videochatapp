@@ -1,0 +1,73 @@
+-----------------------------------------------------------------PRE_REQUISITES---------------------------------------------------------------------------------------
+Step 1] Download python
+	- Go to https://www.python.org/
+	- Go to downloads section - https://www.python.org/downloads/
+	- If your machine is on Windows, download the latest version of Python
+
+Step 2] Install Python
+	- Go to the folder where you donloaded Python
+	- Double click and follow the instructions, make sure you check the option for following during installation
+		- install python for all users
+		- add python path
+Step 3] Verify python installation
+	- On Windows go to Command Prompt (cmd.exe), on other OS use standard shell and type following and hit enter
+	- python --version
+	- As out put you should see the current Python version installed
+
+Step 4] Upgrade "pip" (It is the standard python module installer)
+	- On Windows go to Command Prompt (cmd.exe), on other OS use standard shell and type following and hit enter
+	- python -m pip install --upgrade pip	
+
+Step 5] Install NumPy (It is the core library for scientific computing, which contains a powerful n-dimensional array object support)
+	- On Windows go to Command Prompt (cmd.exe), on other OS use standard shell and type following and hit enter
+	- pip install numpy
+
+Step 6] Install OpenCV (It is the core video/impage processing library)
+	- On Windows go to Command Prompt (cmd.exe), on other OS use standard shell and type following and hit enter
+	- pip install opencv-python
+
+Step 7] Install sounddevice (it is the core sound processing library)
+	- On Windows go to Command Prompt (cmd.exe), on other OS use standard shell and type following and hit enter
+	- python3 -m pip install sounddevice
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------CLIENT APPLICATION INSTALLATION----------------------------------------------------------------------------------------
+Step 1] Create a folder "vconnect" on any of your local drive  (You can name it anything, just remember the name!)
+Step 2] Copy following files into the folder you created in Step 1
+	- prev_details.txt
+	- socket_client_audio.py
+	- socket_client_video.py
+	- socket_client_text.py
+	- vconnect.py
+	- videofeed.py
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------HOW TO USE vconnect-------------------------------------------------------------------------------------------------------------
+Step 1] Double click on file name - vconnect.py
+	- This will start the vconnect application
+
+Step 2] "Configure Devides" Tab
+	- Click "Test Video" button to check the video device connected on your machine
+		- If you see your video, you are good to continue.
+		- Click "Stop Video Test" button to stop video test
+		- If you do not see video then you may need to configure your video device in your machine
+	- Click "Test Audio" button to check your microphone and speaker
+		- Start talking and you should hear back what you said
+		- Click "Stop Audio Test" to stop audio test. You are good to use the vconnect application
+		- If you do not hear any sound then you may need to configure your microphone and speaker
+
+Step 3] "Connect" Tab
+	- Change the "User Name" to Deepak
+	- Keep all other fields AS IS
+	- Click "Join" Button to connect to vconnect server
+	- Once connected "Chat" tab will open
+
+Step 4] "Chat" tab
+	- If you are here that means you have successfully connected to vconnect's "Text" chat gateway
+	- You can continue to chat using text
+
+	- Click "Start Video" to start video communication. This connects your application to vconnect's "Video" communication gateway
+	- Click "Start Audio" to start audio communication. This connects your application to vconnect's "Audio" communication gateway
+
+	- Once done click "Stop Video" and "Stop Audio" to close the connection to "Video" and "Audio" gateway respectively
+
