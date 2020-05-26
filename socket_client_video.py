@@ -199,57 +199,6 @@ def stop_video_comm():
     print('video listen thread stopped')
     #cv2.destroyAllWindows()
 
-def stop_video_comm1():
-    #stop_send_thread()
-    #stop_listen_thread()
-    if( client_socket_video != None ):
-        send('CLOSING')
-
-    try:
-        while(thread_listen_video.is_alive()):
-            print('waiting for listen thread to become None')
-    except Exception as e:
-        print('stopped listen thread')
-
-    try:
-        while(thread_send_video.is_alive()):
-            print('waiting for send thread to become None')
-    except Exception as e:
-        print('stopped send thread')
-
-
-    if (videofeed.capture.isOpened()):
-        videofeed.capture.release()
-        cv2.destroyWindow(self_username)
-
-    cv2.destroyAllWindows()
-
-def stop_send_thread():
-    global thread_send_video
-    global pill_to_kill_send_thread
-
-    if( (thread_send_video != None) and (thread_send_video.is_alive() == True)):
-        #thread_send_video._stop()
-        pill_to_kill_send_thread.set()
-        while(thread_send_video.is_alive() == True):
-            print('waiting for send thread to close')
-    if( client_socket_video != None ):
-        send('CLOSING')
-    
-    thread_send_video = None
-
-def stop_listen_thread():
-    global thread_listen_video
-    global pill_to_kill_listen_thread
-
-    if( (thread_listen_video != None) and (thread_listen_video.is_alive() == True)):
-        #thread_listen_video._stop()
-        while(thread_listen_video.is_alive() == True):
-            print('waiting for listen thread to close')
-        #pill_to_kill_listen_thread.set()
-
-    thread_listen_video = None
-
 def start_sending_video(send_callback, error_callback):
     global thread_send_video
     if (videofeed.capture.isOpened()):

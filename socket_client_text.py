@@ -38,12 +38,71 @@ def connect(ip, port, my_username, error_callback):
 
     return True
 
-# Sends a message to the server
-def send(message):
+def send(message, header_size=HEADER_LENGTH):
     # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
     message = message.encode('utf-8')
-    message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-    client_socket_text.send(message_header + message)
+    message_header = f"{len(message):<{header_size}}".encode('utf-8')
+    to_send = message_header + message
+    send_size = len(to_send)
+    tot_sent = 0
+    while tot_sent < send_size:
+        ret = client_socket_text.send(to_send[tot_sent:send_size])
+        tot_sent += ret
+
+def receive_message(client_socket, receive_size=HEADER_LENGTH):
+
+    try:
+        # Receive our "header" containing message length, it's size is defined and constant
+        #message_header = client_socket.recv(receive_size)
+
+        message_header = ''.encode('utf-8')
+        totrec = 0
+        while totrec<receive_size :
+            chunk = client_socket.recv(receive_size - totrec)
+            #if chunk == '':
+            if chunk is False:
+                print("In receive_message: received 0 bytes during receive of data size.")
+                #raise RuntimeError("Socket connection broken")
+                #break
+                return False
+            totrec += len(chunk)
+            message_header = message_header + chunk
+
+
+        # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
+        if not len(message_header):
+            return False
+
+        # Convert header to int value
+        message_length = int(message_header.decode('utf-8').strip())
+
+        message_data = ''.encode('utf-8')
+        totrec = 0
+        while totrec<message_length :
+            chunk = client_socket.recv(message_length - totrec)
+            #if chunk == '':
+            if chunk is False:
+                print("In receive_message: received 0 bytes during receive of data.")
+                #raise RuntimeError("Socket connection broken")
+                #break
+                return False
+            totrec += len(chunk)
+            message_data = message_data + chunk
+
+        if not len(message_data):
+            return False
+
+        # Return an object of message header and message data
+        #return {'header': message_header, 'data': client_socket.recv(message_length)}
+        return {'header': message_header, 'data': message_data}
+
+    except:
+
+        # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
+        # or just lost his connection
+        # socket.close() also invokes socket.shutdown(socket.SHUT_RDWR) what sends information about closing the socket (shutdown read/write)
+        # and that's also a cause when we receive an empty message
+        return False
 
 def close_connection():
     global client_socket_text
@@ -67,6 +126,8 @@ def stop_text_comm():
     except Exception as e:
         print('stopped listen thread')
 
+    print('Text listen thread stopped')
+
 # Starts listening function in a thread
 # incoming_message_callback - callback to be called when new message arrives
 # error_callback - callback to be called on error
@@ -83,7 +144,7 @@ def listen(incoming_message_callback, error_callback):
     while not pill_to_kill_listen_thread.wait(0):
         try:
             # Receive our "header" containing username length, it's size is defined and constant
-            username_header = client_socket_text.recv(HEADER_LENGTH)
+            """username_header = client_socket_text.recv(HEADER_LENGTH)
 
             # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
             if not len(username_header):
@@ -93,9 +154,16 @@ def listen(incoming_message_callback, error_callback):
             username_length = int(username_header.decode('utf-8').strip())
 
             # Receive and decode username
-            username = client_socket_text.recv(username_length).decode('utf-8')
+            username = client_socket_text.recv(username_length).decode('utf-8')"""
 
-            keyword_header = client_socket_text.recv(HEADER_LENGTH)
+            username_dict = receive_message(client_socket_text, HEADER_LENGTH)
+            if(username_dict is False):
+                print('username_dict is False. continuing...')
+                continue
+
+            username = (username_dict['data'].decode('utf-8')).strip()
+
+            """keyword_header = client_socket_text.recv(HEADER_LENGTH)
             if not len(keyword_header):
                 #error_callback('Connection closed by the server', False)
                 print('Connection closed by server: client_socket_audio.recv(HEADER_LENGTH)')
@@ -103,18 +171,29 @@ def listen(incoming_message_callback, error_callback):
 
             # Convert header to int value
             keyword_length = int(keyword_header.decode('utf-8').strip())
-            keyworkd_message = client_socket_text.recv(keyword_length).decode('utf-8')
+            keyworkd_message = client_socket_text.recv(keyword_length).decode('utf-8')"""
+
+            keyword_dict = receive_message(client_socket_text, HEADER_LENGTH)
+            if(keyword_dict is False):
+                print('keyword_dict is False. continuing...')
+                continue
+
+            keyworkd_message = (keyword_dict['data'].decode('utf-8')).strip()
+
             if(keyworkd_message.upper() == 'CLOSING'):
-                print('received CLOSING message from: '+username)
+                print(f'Received CLOSING message from: {username}')
+                continue
             elif(keyworkd_message.upper() == 'ACK_CLOSED'):
                 #print('Stopping listen thread as received ACK_CLOSED message from: '+username)
                 pill_to_kill_listen_thread.set()
                 break                
             elif(keyworkd_message.upper() == 'DATA'):
                 # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
-                message_header = client_socket_text.recv(HEADER_LENGTH)
+                message_dict = receive_message(client_socket_text, HEADER_LENGTH)
+                message = (message_dict['data'].decode('utf-8')).strip()
+                """message_header = client_socket_text.recv(HEADER_LENGTH)
                 message_length = int(message_header.decode('utf-8').strip())
-                message = client_socket_text.recv(message_length).decode('utf-8')
+                message = client_socket_text.recv(message_length).decode('utf-8')"""
 
                 # Print message
                 incoming_message_callback(username, message)
@@ -123,4 +202,10 @@ def listen(incoming_message_callback, error_callback):
 
         except Exception as e:
             # Any other exception - something happened, exit
-            error_callback('Reading error: {}'.format(str(e)))
+            #error_callback('Reading error: {}'.format(str(e)))
+            print('Falied in listen :' + str(e))
+
+    pill_to_kill_listen_thread.set()
+    print('Stopped listen text thread')
+
+

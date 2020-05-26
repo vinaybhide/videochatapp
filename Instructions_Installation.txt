@@ -33,7 +33,7 @@ Step 7] Install sounddevice (it is the core sound processing library)
 
 -----------------------------------------------------------------------CLIENT APPLICATION INSTALLATION----------------------------------------------------------------------------------------
 Step 1] Create a folder "vconnect" on any of your local drive  (You can name it anything, just remember the name!)
-Step 2] Copy following files into the folder you created in Step 1
+Step 2] Copy all the files files into the folder you created in Step 1
 	- prev_details.txt
 	- socket_client_audio.py
 	- socket_client_video.py
