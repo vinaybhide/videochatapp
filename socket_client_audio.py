@@ -24,7 +24,7 @@ pill_to_kill_listen_thread = None
 stop_connection = False
 
 # Connects to the server
-def connect(ip, port, my_username, input_device_dict, output_device_dict, error_callback):
+def connect(ip, port, my_username, input_device_dict, output_device_dict, input_device_id, output_device_id, error_callback):
     global client_socket_audio
     global self_username
     global audio_in
@@ -62,22 +62,27 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, error_
         close_connection()
         return -2
 
-    set_input_device_options()
-
     #audio_in = sd.InputStream(samplerate=44100, dtype='float32')
-    audio_in = sd.InputStream(samplerate=float(input_device_dict['default_samplerate']), blocksize=READ_SIZE, dtype='float32')
-    audio_in.start()
+    try:
+        audio_in = sd.RawInputStream(samplerate=int(input_device_dict['default_samplerate']), 
+            blocksize=READ_SIZE, device=input_device_id, 
+            channels=input_device_dict['max_input_channels'],  
+            dtype='float32', latency=input_device_dict['default_high_input_latency'] )
 
-    set_output_device_options()
-    audio_out = sd.OutputStream(samplerate=float(output_device_dict['default_samplerate']), blocksize=READ_SIZE, dtype='float32')
-    audio_out.start()
+        audio_in.start()
+    except Exception as e:
+        close_connection()
+        return -3
+    try:
+        audio_out = sd.RawOutputStream(samplerate=int(output_device_dict['default_samplerate']), 
+                        blocksize=READ_SIZE, device=output_device_id, 
+                        channels=output_device_dict['max_output_channels'],  
+                        dtype='float32', latency=output_device_dict['default_high_output_latency'] )
 
-    """audio_in = sd.InputStream(samplerate=44100, dtype='float32')
-    audio_out = sd.OutputStream(samplerate=44100, dtype='float32')
-    if not (audio_in):
-        print('Can not open microphone')
-        #client_socket_video.close()
-        return False"""
+        audio_out.start()
+    except Exception as e:
+        close_connection()
+        return -4
 
     pill_to_kill_listen_thread = Event()
     pill_to_kill_send_thread = Event()
@@ -211,23 +216,9 @@ def send_audio(send_callback, error_callback):
             send('DATA')
 
             frame, ret = audio_in.read(READ_SIZE)
-
-            """shape_row_bytes = (str(frame.shape[0])).encode('utf-8')
-            message_header = f"{len(shape_row_bytes):<{NP_ROW_CHARS_SIZE}}".encode('utf-8')
-            client_socket_audio.send(message_header + shape_row_bytes)
-            #print('after : client_socket_audio.send(message_header + shape_row_bytes)')
             
-            shape_col_bytes = (str(frame.shape[1])).encode('utf-8')
-            message_header = f"{len(shape_col_bytes):<{NP_COL_CHARS_SIZE}}".encode('utf-8')
-            client_socket_audio.send(message_header + shape_col_bytes)"""
-            #print('after : client_socket_audio.send(message_header + shape_col_bytes)')
-
+            #Commenting for raw input stream
             """shape_str = f"{frame.shape[0]},{frame.shape[1]}"
-            shape_str_bytes = shape_str.encode('utf-8')
-            message_header = f"{len(shape_str_bytes):<{HEADER_LENGTH}}".encode('utf-8')
-            client_socket_audio.send(message_header + shape_str_bytes)"""
-
-            shape_str = f"{frame.shape[0]},{frame.shape[1]}"
             send(shape_str, HEADER_LENGTH)
 
             #now send the entire nparray as bytes
@@ -238,6 +229,10 @@ def send_audio(send_callback, error_callback):
             #send_size = len(send_bytes)
             send_size = len(compressed_send_bytes)
 
+            send(str(send_size))"""
+            
+            compressed_send_bytes = zlib.compress(frame, 9)
+            send_size = len(compressed_send_bytes)
             send(str(send_size))
             totalsent = 0
             while totalsent < send_size :
@@ -287,38 +282,12 @@ def listen(listen_callback, error_callback):
     #while True:
     while not pill_to_kill_listen_thread.wait(0):
         try:
-            """ username_header = client_socket_audio.recv(HEADER_LENGTH)
-            #print('after :username_header = client_socket_audio.recv(HEADER_LENGTH)')
-
-            # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-            if not len(username_header):
-                print('Connection closed by server: if not len(username_header)')
-                error_callback('Connection closed by the server', False)
-
-            # Convert header to int value
-            username_length = int(username_header.decode('utf-8').strip())
-            #print('after username_length: ' + str(username_length))
-
-            # Receive and decode username
-            username = client_socket_audio.recv(username_length).decode('utf-8')
-            #print('client_socket_audio.recv: username= ' + username)"""
-
             username_dict = receive_message(client_socket_audio, HEADER_LENGTH)
             if(username_dict is False):
                 print('username_dict is False. continuing...')
                 continue
 
             username = (username_dict['data'].decode('utf-8')).strip()
-
-            """keyword_header = client_socket_audio.recv(HEADER_LENGTH)
-            if not len(keyword_header):
-                #error_callback('Connection closed by the server', False)
-                print('Connection closed by server: client_socket_audio.recv(HEADER_LENGTH)')
-                continue
-
-            # Convert header to int value
-            keyword_length = int(keyword_header.decode('utf-8').strip())
-            keyworkd_message = client_socket_audio.recv(keyword_length).decode('utf-8')"""
 
             keyword_dict = receive_message(client_socket_audio, HEADER_LENGTH)
             if(keyword_dict is False):
@@ -329,9 +298,6 @@ def listen(listen_callback, error_callback):
 
             if(keyworkd_message.upper() == 'CLOSING'):
                 print('received CLOSING message from: '+username)
-                """if(audio_out.closed == False):
-                    audio_out.close()
-                audio_out = None"""
             elif(keyworkd_message.upper() == 'ACK_CLOSED'):
                 #print('Stopping listen thread as received ACK_CLOSED message from: '+username)
                 pill_to_kill_listen_thread.set()
@@ -340,12 +306,7 @@ def listen(listen_callback, error_callback):
                 #now get the share of nparray. shape is (row, cols, dim) ex. shape: (480, 640, 3)
                 #print('before :client_socket_audio.recv(NP_ROW_CHARS_SIZE)')
 
-                """shape_size_header = client_socket_audio.recv(HEADER_LENGTH)
-                shape_size_length = int(shape_size_header.decode('utf-8').strip())
-
-                shape_size_str = client_socket_audio.recv(shape_size_length).decode('utf-8')"""
-
-                shape_dict = receive_message(client_socket_audio, HEADER_LENGTH)
+                """shape_dict = receive_message(client_socket_audio, HEADER_LENGTH)
                 if(shape_dict is False):
                     print('shape_dict is False. continuing...')
                     continue
@@ -354,21 +315,10 @@ def listen(listen_callback, error_callback):
 
                 shape_size_split = shape_size_str.split(',')
                 shape_row_int = int(shape_size_split[0])
-                shape_col_int = int(shape_size_split[1])
+                shape_col_int = int(shape_size_split[1])"""
 
-                """shape_row_header = client_socket_audio.recv(NP_ROW_CHARS_SIZE)
-                shape_row_length = int(shape_row_header.decode('utf-8').strip())
-                shape_row_int = int(client_socket_audio.recv(shape_row_length).decode('utf-8'))
-
-                #print('before :client_socket_audio.recv(NP_COL_CHARS_SIZE)')
-                shape_col_header = client_socket_audio.recv(NP_COL_CHARS_SIZE)
-                shape_col_length = int(shape_col_header.decode('utf-8').strip())
-                shape_col_int = int(client_socket_audio.recv(shape_col_length).decode('utf-8'))"""
 
                 #get the size of the bytes array
-                """message_size_header = client_socket_audio.recv(HEADER_LENGTH)
-                message_size_length = int(message_size_header.decode('utf-8').strip())
-                message_size = int(client_socket_audio.recv(message_size_length).decode('utf-8'))"""
 
                 message_size_dict = receive_message(client_socket_audio, HEADER_LENGTH)
                 if(message_size_dict is False):
@@ -404,9 +354,10 @@ def listen(listen_callback, error_callback):
                 """
                 if(len(frame) > 0):
                     frame = zlib.decompress(frame)
-                    received_nparray = np.frombuffer(frame, dtype=np.float32)
+                    """received_nparray = np.frombuffer(frame, dtype=np.float32)
                     received_nparray = received_nparray.reshape(shape_row_int, shape_col_int)
-                    audio_out.write(received_nparray)
+                    audio_out.write(received_nparray)"""
+                    audio_out.write(frame)
                     #print('after : audio_out.write(received_nparray)')
         except Exception as e:
             # Any other exception - something happened, exit

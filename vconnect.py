@@ -37,26 +37,43 @@ class vConnectApp():
             prev_video_port = d[2]
             prev_audio_port = d[3]
             prev_username = d[4]
+            #prev_user_mgmt_port = ''
         else:
             prev_ip = ''
             prev_text_port = ''
             prev_video_port = ''
             prev_audio_port = ''
             prev_username = ''
+            #prev_user_mgmt_port = ''
 
         #self.content = ttk.Frame(self.root, padding=(5, 5, 12, 0))
         self.content = ttk.Frame(self.root)
 
         self.notebook = ttk.Notebook(self.content)
+        #self.fUserMgmtPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")#, padding=5)
         self.fConfigurePage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")#, padding=5)
         self.fConnectPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")#, padding=5)
         self.fInfoPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")
         self.fChatPage = ttk.Frame(master=self.notebook, borderwidth=5, relief="sunken")
 
+        #self.notebook.add(self.fUserMgmtPage, text='Login/New User')
         self.notebook.add(self.fConfigurePage, text='Configure Devices')
         self.notebook.add(self.fConnectPage, text='Connect')
         self.notebook.add(self.fChatPage, text = 'Chat')
         self.notebook.add(self.fInfoPage, text='Information')
+
+        #create user mgmt fields
+        """self.frame_usermgmt = ttk.Frame(self.fUserMgmtPage) #, borderwidth=5, relief="sunken")
+        self.email_label = ttk.Label(self.frame_usermgmt, text='Email id: ')
+        self.email_text = StringVar()
+        self.email_entry = ttk.Entry(self.frame_usermgmt, textvariable=self.email_text, width=50)
+
+        self.password_label = ttk.Label(self.frame_usermgmt, text='Password: ')
+        self.password_text = StringVar()
+        self.password_entry = ttk.Entry(self.frame_usermgmt, textvariable=self.password_text, width=50, show="*")
+
+        self.btn_login = ttk.Button(self.frame_usermgmt, text="Login")#, command=self.login)
+        self.btn_new_user = ttk.Button(self.frame_usermgmt, text="Create New User")#, command=self.new_user)"""
 
         #create configure device fields
         self.frame_configure = ttk.Frame(self.fConfigurePage) #, borderwidth=5, relief="sunken")
@@ -64,15 +81,26 @@ class vConnectApp():
         self.btn_video_test = ttk.Button(self.frame_configure, text="Test Video", command=self.test_video)
 
         #self.frame_audio_config = ttk.Frame(self.fConfigurePage) #, borderwidth=5, relief="sunken")
-        self.speaker_select_label = ttk.Label(self.frame_configure, text='Selected speaker: ')
-        self.speaker_select_text = StringVar(value='')
-        self.speaker_select_entry = ttk.Entry(self.frame_configure, textvariable=self.speaker_select_text, width=60)
+        self.speaker_select_label = ttk.Label(self.frame_configure, text='Select Output(Speaker) Device: ')
+        self.output_device_combo_text = StringVar()
+        self.output_device_combo = ttk.Combobox(self.frame_configure, width=60, 
+                textvariable=self.output_device_combo_text, state='readonly')
+        #self.speaker_select_text = StringVar(value='')
+        #self.speaker_select_entry = ttk.Entry(self.frame_configure, textvariable=self.speaker_select_text, width=60, state='readonly')
+        self.speaker_info_label = ttk.Label(self.frame_configure, text='Item that starts with <, indicates default output device' )
 
-        self.mic_select_label = ttk.Label(self.frame_configure, text='Selected Microphone: ')
-        self.mic_select_text = StringVar(value='')
-        self.mic_select_entry = ttk.Entry(self.frame_configure, textvariable=self.mic_select_text, width=60)
+        self.mic_select_label = ttk.Label(self.frame_configure, text='Select Input(Mic) device: ')
+        self.input_device_combo_text = StringVar()
+        self.input_device_combo = ttk.Combobox(self.frame_configure, width=60, 
+                textvariable=self.input_device_combo_text, state='readonly')
+        #self.mic_select_text = StringVar(value='')
+        #self.mic_select_entry = ttk.Entry(self.frame_configure, textvariable=self.mic_select_text, width=60, state='readonly')
+        self.mic_info_label = ttk.Label(self.frame_configure, text='Item that starts with >, indicates default input device' )
+
         self.btn_audio_test = ttk.Button(self.frame_configure, text="Test Audio", command=self.test_audio)
 
+        self.output_device_combo.bind('<<ComboboxSelected>>', self.OnOutputDeviceChanged)
+        self.input_device_combo.bind('<<ComboboxSelected>>', self.OnInputDeviceChanged)
 
         #create Connect Page fields
         self.frame_connect_details = ttk.Frame(self.fConnectPage) #, borderwidth=5, relief="sunken")
@@ -134,18 +162,35 @@ class vConnectApp():
 
         self.content.grid(column=0, row=0, sticky=(N, S, E, W))
         self.notebook.grid(row=0, column=0, sticky=(N, E, S, W), padx=5, pady=5) 
-        
+
+        #User Mgmt Page
+        """self.frame_usermgmt.grid(row=1, column=1, sticky=(N, S, E, W), padx=5, pady=5)
+        self.email_label.grid(row=0, column=2, padx=2, pady=2, sticky=(N, E))
+        self.email_entry.grid(row=0, column=3, padx=2, pady=2, sticky=(N, E, W))
+
+        self.password_label.grid(row=1, column=2, padx=2, pady=2, sticky=(N, E))
+        self.password_entry.grid(row=1, column=3, padx=2, pady=2, sticky=(N, E, W))
+
+        self.btn_login.grid(row=2, column=3, padx=5, pady=5)
+        self.btn_new_user.grid(row=2, column=4, padx=10, pady=10)"""
+
+
         #configure page
-        self.frame_configure.grid(column=3, row=1, sticky=(N, S, E, W), padx=5, pady=5)
+        self.frame_configure.grid(column=0, row=1, sticky=(N, S, E, W), padx=5, pady=5)
         self.video_select_label.grid(column=0, row=0, padx=2, pady=2, sticky=(N, E))
         self.btn_video_test.grid(column=1, row=0, padx=2, pady=2, sticky=(N, W))
 
         #self.frame_audio_config.grid(column=0, row=1, sticky=(N, S, E, W), padx=5, pady=5)
         self.speaker_select_label.grid(column=0, row=1, padx=2, pady=2, sticky=(N, E))
-        self.speaker_select_entry.grid(column=1, row=1, padx=2, pady=2, sticky=(N, E, W))
-        self.mic_select_label.grid(column=0, row=2, padx=2, pady=2, sticky=(N, E))
-        self.mic_select_entry.grid(column=1, row=2, padx=2, pady=2, sticky=(N, E, W))
-        self.btn_audio_test.grid(column=1, row=3, padx=2, pady=2, sticky=(N, W))
+        self.output_device_combo.grid(column=1, row=1, padx=2, pady=2, sticky=(N, W))
+        #self.speaker_select_entry.grid(column=2, row=1, padx=2, pady=2, sticky=(N, E, W))
+        self.speaker_info_label.grid(column=1, row=2, padx=10, pady=2, sticky=(N, W))        
+
+        self.mic_select_label.grid(column=0, row=3, padx=2, pady=2, sticky=(N, E))
+        self.input_device_combo.grid(column=1, row=3, padx=2, pady=2, sticky=(N, W))
+        #self.mic_select_entry.grid(column=2, row=3, padx=2, pady=2, sticky=(N, E))
+        self.mic_info_label.grid(column=1, row=4, padx=2, pady=2, sticky=(N, W))
+        self.btn_audio_test.grid(column=1, row=5, padx=10, pady=2, sticky=(N, W))
 
 
         #Connect page
@@ -203,20 +248,45 @@ class vConnectApp():
         self.content.rowconfigure(4, weight=3)
         self.content.rowconfigure(5, weight=3)
 
-        self.fConfigurePage.columnconfigure(0, weight=3)
+        """self.fUserMgmtPage.columnconfigure(0, weight=3)
+        self.fUserMgmtPage.columnconfigure(1, weight=3)
+        self.fUserMgmtPage.columnconfigure(2, weight=1)
+        self.fUserMgmtPage.columnconfigure(3, weight=3)
+        self.fUserMgmtPage.columnconfigure(4, weight=1)
+
+        self.fUserMgmtPage.rowconfigure(0, weight=3)
+        self.fUserMgmtPage.rowconfigure(1, weight=3)
+        self.fUserMgmtPage.rowconfigure(2, weight=3)
+
+        self.frame_usermgmt.columnconfigure(0, weight=3)
+        self.frame_usermgmt.columnconfigure(1, weight=3)
+        self.frame_usermgmt.columnconfigure(2, weight=1)
+        self.frame_usermgmt.columnconfigure(3, weight=3)
+        self.frame_usermgmt.columnconfigure(4, weight=1)
+
+        self.frame_usermgmt.rowconfigure(0, weight=3)
+        self.frame_usermgmt.rowconfigure(1, weight=3)
+        self.frame_usermgmt.rowconfigure(2, weight=3)"""
+
+        self.fConfigurePage.columnconfigure(0, weight=1)
         self.fConfigurePage.columnconfigure(1, weight=3)
 
         self.fConfigurePage.rowconfigure(0, weight=1)
         self.fConfigurePage.rowconfigure(1, weight=1)
         self.fConfigurePage.rowconfigure(2, weight=1)
+        self.fConfigurePage.rowconfigure(3, weight=1)
+        self.fConfigurePage.rowconfigure(4, weight=1)
+        self.fConfigurePage.rowconfigure(5, weight=1)
 
         self.frame_configure.columnconfigure(0, weight=1)
-        self.frame_configure.columnconfigure(1, weight=1)
+        self.frame_configure.columnconfigure(1, weight=3)
 
         self.frame_configure.rowconfigure(0, weight=1)
         self.frame_configure.rowconfigure(1, weight=1)
         self.frame_configure.rowconfigure(2, weight=1)
-
+        self.frame_configure.rowconfigure(3, weight=1)
+        self.frame_configure.rowconfigure(4, weight=1)
+        self.frame_configure.rowconfigure(5, weight=1)
 
         self.fConnectPage.columnconfigure(0, weight=3)
         self.fConnectPage.columnconfigure(1, weight=3)
@@ -278,15 +348,14 @@ class vConnectApp():
         self.frame_command_btn.rowconfigure(0, weight=1)
 
 
-        self.speaker_dict = self.get_speaker_list()
-        self.speaker_select_text.set(self.speaker_dict['name'])
-        self.mic_dict = self.get_mic_list()
-        self.mic_select_text.set(self.mic_dict['name'])
+        self.speaker_dict = None
+        self.mic_dict = None
+        self.input_device_id = -1
+        self.output_device_id = -1
+        self.devices_list = None
+        self.sdlist = None
 
-        self.info_message_text.configure(state=NORMAL)
-        self.info_message_text.insert(END, f"Input Device Properties:" + '\n' +f'{self.mic_dict}'+ '\n')
-        self.info_message_text.insert(END, f"Output Device Properties:" + '\n' +f'{self.speaker_dict}'+ '\n')
-        self.info_message_text.configure(state=DISABLED)
+        self.all_devices()
 
         self.notebook.tab(2, state=DISABLED)
 
@@ -310,6 +379,55 @@ class vConnectApp():
     'default_high_input_latency':0.18
     'default_high_output_latency':0.18
     'default_samplerate':44100.0"""
+
+    def update_info(self, message):
+        self.info_message_text.configure(state=NORMAL)
+        self.info_message_text.insert(END, message + '\n')
+        self.info_message_text.configure(state=DISABLED)
+
+    def all_devices(self):
+        self.devices_list = sd.query_devices()
+        #print(devices_list)
+        sdstring = self.devices_list.__repr__()
+        #print(sdstring)
+        self.sdlist = sdstring.split('\n')
+        #print(sdlist)        
+        self.output_device_combo['values'] = self.sdlist
+        self.input_device_combo['values'] = self.sdlist
+
+        self.input_device_id = -1
+        self.output_device_id = -1
+        for i in range(len(self.sdlist)):
+            item = self.sdlist[i]
+            if(self.output_device_id == -1):
+                index = item.find('<', 0, 1)
+                if(index >= 0):
+                    self.output_device_id = i
+            if(self.input_device_id == -1):
+                index = item.find('>', 0, 1)
+                if(index >= 0):
+                    self.input_device_id = i
+
+        if(self.output_device_id >= 0):
+            self.output_device_combo.current(self.output_device_id)
+            self.output_device_combo.event_generate('<<ComboboxSelected>>')
+
+        if(self.input_device_id >= 0):
+            self.input_device_combo.current(self.input_device_id)
+            self.input_device_combo.event_generate('<<ComboboxSelected>>')
+            
+
+    def OnOutputDeviceChanged(self, event):
+        self.output_device_id = self.output_device_combo.current()
+        #self.speaker_select_text.set(self.output_device_combo_text.get())
+        self.speaker_dict = self.devices_list[self.output_device_id]
+        self.update_info(f"Output Device Properties:" + '\n' +f'{self.speaker_dict}')
+
+    def OnInputDeviceChanged(self, event):
+        self.input_device_id = self.input_device_combo.current()
+        #self.mic_select_text.set(self.input_device_combo_text.get())
+        self.mic_dict = self.devices_list[self.input_device_id]
+        self.update_info(f"Input Device Properties:" + '\n' +f'{self.mic_dict}')
 
     def get_speaker_list(self):
         device_dict = sd.query_devices(kind='output')
@@ -351,15 +469,32 @@ class vConnectApp():
 
     def test_audio(self):
         if(self.is_test_audio_clicked == False):
-            self.audioin = sd.InputStream(samplerate=int(self.mic_dict['default_samplerate']), blocksize=2048, dtype='float32')
-            self.audioout = sd.OutputStream(samplerate=int(self.speaker_dict['default_samplerate']),blocksize=2048, dtype='float32')        
+            try:
+                self.audioin = sd.RawInputStream(samplerate=int(self.mic_dict['default_samplerate']), 
+                    blocksize=2048, device=self.input_device_id, 
+                    channels=self.mic_dict['max_input_channels'],  
+                    dtype='float32', latency=self.mic_dict['default_high_input_latency'] )
+                audioin_flag = True
+            except Exception as e:
+                msgbx.showerror("Audio-in creation error", f'{e}')
+                audioin_flag = False
+            try:    
+                self.audioout = sd.RawOutputStream(samplerate=int(self.speaker_dict['default_samplerate']), 
+                    blocksize=2048, device=self.output_device_id, 
+                    channels=self.speaker_dict['max_output_channels'],  
+                    dtype='float32', latency=self.mic_dict['default_high_output_latency'] )
+                audioout_flag = True
+            except Exception as e:
+                msgbx.showerror("Audio-out creation error", f'{e}')
+                audioout_flag = False
 
-            self.is_test_audio_clicked = True
+            if(audioin_flag and audioout_flag):
+                self.is_test_audio_clicked = True
 
-            thread_start_recording = Thread(target=self.record_audio)
-            thread_start_recording.start()
+                thread_start_recording = Thread(target=self.record_audio)
+                thread_start_recording.start()
 
-            self.btn_audio_test.configure(text='Stop Audio Test')
+                self.btn_audio_test.configure(text='Stop Audio Test')
         else:
             self.is_test_audio_clicked = False
             self.btn_audio_test.configure(text='Test Audio')
@@ -392,9 +527,7 @@ class vConnectApp():
             f.write(f'{ip},{port_text},{port_video},{port_audio},{username}')
             f.close()
 
-        self.info_message_text.configure(state=NORMAL)
-        self.info_message_text.insert(END, f"Attempting to join {ip}: text port={port_text} videoport={port_video} audioport={port_audio} as {username}" + '\n')
-        self.info_message_text.configure(state=DISABLED)
+        self.update_info(f"Attempting to join {ip}: text port={port_text} videoport={port_video} audioport={port_audio} as {username}")
         self.notebook.tab(3, state='normal')
         self.notebook.select(3)
         self.connect()
@@ -407,7 +540,10 @@ class vConnectApp():
         username = self.username_text.get()
 
         if not socket_client_text.connect(ip, port_text, username, self.show_error):
+            self.update_info(f"Error while connecting to server at {ip}: text port={port_text} videoport={port_video} audioport={port_audio} as {username}")
             return
+
+        self.update_info(f"Connected to server at {ip}: text port={port_text} videoport={port_video} audioport={port_audio} as {username}")
 
         #start the text communication right away
         socket_client_text.start_listening(self.incoming_message, self.show_error)
@@ -427,7 +563,8 @@ class vConnectApp():
         self.chat_history_text.insert(END, '\n'+username, ('r', 'b'))
 
         self.chat_history_text.insert(END, message)
-
+        
+        self.chat_history_text.see('end')
         self.chat_history_text.configure(state=DISABLED)
 
 
@@ -471,7 +608,9 @@ class vConnectApp():
         ip = self.ip_text.get()
         username = self.username_text.get()
 
-        self.is_self_audio_avlbl = socket_client_audio.connect(ip, port_audio, username, self.speaker_dict, self.mic_dict, self.show_error)
+        self.is_self_audio_avlbl = socket_client_audio.connect(ip, port_audio, username, 
+                self.speaker_dict, self.mic_dict, self.input_device_id, self.output_device_id, 
+                self.show_error)
         if self.is_self_audio_avlbl == -1:
             #this means client was not able to connect to server, we will not be able to use video chat at all
             print('socket_client_audio.connect returned -1: Not able to connect to server')
@@ -481,6 +620,16 @@ class vConnectApp():
             #means error while sending the username, which means we do not have connection 
             # to server or server refused
             print('socket_client_audio.connect returned -2: send of username failed and return <= 0')
+            self.btn_start_audio.configure(state=NORMAL)
+            self.btn_stop_audio.configure(state=DISABLED)
+        elif self.is_self_audio_avlbl == -3:
+            #means error while creating input stream, 
+            print('socket_client_audio.connect returned -3: Error while creating Input stream. Please select correct input device in "Configure Device" tab')
+            self.btn_start_audio.configure(state=NORMAL)
+            self.btn_stop_audio.configure(state=DISABLED)
+        elif self.is_self_audio_avlbl == -4:
+            #means error while creating output stream
+            print('socket_client_audio.connect returned -4: Error while creating Output stream. Please select correct output device in "Configure Device" tab')
             self.btn_start_audio.configure(state=NORMAL)
             self.btn_stop_audio.configure(state=DISABLED)
         else:   #we got connected
