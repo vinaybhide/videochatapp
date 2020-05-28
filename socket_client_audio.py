@@ -12,7 +12,7 @@ import zlib
 HEADER_LENGTH = 10
 NP_ROW_CHARS_SIZE = 10
 NP_COL_CHARS_SIZE = 4
-READ_SIZE = 2048
+READ_SIZE = 4096
 client_socket_audio = None
 audio_in = None
 audio_out = None
@@ -66,8 +66,9 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
     try:
         audio_in = sd.RawInputStream(samplerate=int(input_device_dict['default_samplerate']), 
             blocksize=READ_SIZE, device=input_device_id, 
-            channels=input_device_dict['max_input_channels'],  
-            dtype='float32', latency=input_device_dict['default_high_input_latency'] )
+            #channels=input_device_dict['max_input_channels'],  
+            #channels=1,
+            dtype=np.float32, latency=input_device_dict['default_low_input_latency'] )
 
         audio_in.start()
     except Exception as e:
@@ -75,9 +76,10 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
         return -3
     try:
         audio_out = sd.RawOutputStream(samplerate=int(output_device_dict['default_samplerate']), 
-                        blocksize=READ_SIZE, device=output_device_id, 
-                        channels=output_device_dict['max_output_channels'],  
-                        dtype='float32', latency=output_device_dict['default_high_output_latency'] )
+            blocksize=READ_SIZE, device=output_device_id, 
+            #channels=output_device_dict['max_output_channels'],  
+            #channels=1,
+            dtype=np.float32, latency=output_device_dict['default_low_output_latency'] )
 
         audio_out.start()
     except Exception as e:
@@ -217,23 +219,23 @@ def send_audio(send_callback, error_callback):
 
             frame, ret = audio_in.read(READ_SIZE)
             
-            #Commenting for raw input stream
+            send_bytes = frame[:]
             """shape_str = f"{frame.shape[0]},{frame.shape[1]}"
             send(shape_str, HEADER_LENGTH)
 
             #now send the entire nparray as bytes
-            send_bytes = frame.tobytes()
+            send_bytes = frame.tobytes()"""
     
             compressed_send_bytes = zlib.compress(send_bytes, 9)
             
             #send_size = len(send_bytes)
             send_size = len(compressed_send_bytes)
 
-            send(str(send_size))"""
-            
-            compressed_send_bytes = zlib.compress(frame, 9)
-            send_size = len(compressed_send_bytes)
             send(str(send_size))
+            
+            """compressed_send_bytes = zlib.compress(frame, 9)
+            send_size = len(compressed_send_bytes)
+            send(str(send_size))"""
             totalsent = 0
             while totalsent < send_size :
                 #sent = client_socket_audio.send(send_bytes)

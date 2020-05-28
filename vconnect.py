@@ -7,6 +7,7 @@ import socket_client_text, socket_client_video, socket_client_audio
 import cv2
 import sounddevice as sd
 from threading import Thread
+import numpy as np
 
 class vConnectApp():
     def __init__(self):
@@ -473,7 +474,7 @@ class vConnectApp():
                 self.audioin = sd.RawInputStream(samplerate=int(self.mic_dict['default_samplerate']), 
                     blocksize=2048, device=self.input_device_id, 
                     channels=self.mic_dict['max_input_channels'],  
-                    dtype='float32', latency=self.mic_dict['default_high_input_latency'] )
+                    dtype=np.float32, latency=self.mic_dict['default_low_input_latency'] )
                 audioin_flag = True
             except Exception as e:
                 msgbx.showerror("Audio-in creation error", f'{e}')
@@ -482,7 +483,7 @@ class vConnectApp():
                 self.audioout = sd.RawOutputStream(samplerate=int(self.speaker_dict['default_samplerate']), 
                     blocksize=2048, device=self.output_device_id, 
                     channels=self.speaker_dict['max_output_channels'],  
-                    dtype='float32', latency=self.mic_dict['default_high_output_latency'] )
+                    dtype=np.float32, latency=self.mic_dict['default_low_output_latency'] )
                 audioout_flag = True
             except Exception as e:
                 msgbx.showerror("Audio-out creation error", f'{e}')
@@ -506,7 +507,7 @@ class vConnectApp():
         while (self.is_test_audio_clicked == True):
             frame, ret = self.audioin.read(2048)
             #sd.sleep(int(1000))
-            self.audioout.write(frame)
+            self.audioout.write(frame[:])
 
         self.audioin.abort()
         self.audioout.abort()

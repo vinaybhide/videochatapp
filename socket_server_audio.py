@@ -127,14 +127,6 @@ def thread_listner(notified_socket):
         if( keyword_dict is False):
             print('keyword_dict is False, continuing...')
             continue
-            """print('During keyword_dict = receive_message, Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
-            # Remove from list for socket.socket()
-            sockets_list.remove(notified_socket)
-
-            # Remove from our list of users
-            del clients[notified_socket]
-
-            continue"""
         keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
         if(keyword_message.upper() == 'CLOSING'):
             #print('keyword = CLOSING')
@@ -207,11 +199,9 @@ def thread_listner(notified_socket):
                     send_message(client_socket, keyword_dict['header'] + keyword_dict['data'])
 
                     #now send the shape of original stream
-                    #client_socket.send(shape_size_dict['header'] + shape_size_dict['data'])
-                    #send_message(client_socket, shape_size_dict['header'] + shape_size_dict['data'])
+                    """send_message(client_socket, shape_size_dict['header'] + shape_size_dict['data'])"""
 
                     #send the size of the message
-                    #client_socket.send(message_size_dict['header'] + message_size_dict['data'])
                     send_message(client_socket, message_size_dict['header'] + message_size_dict['data'])
 
                     totalsent = 0
