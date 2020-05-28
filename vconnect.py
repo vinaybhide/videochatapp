@@ -609,7 +609,7 @@ class vConnectApp():
         username = self.username_text.get()
 
         self.is_self_audio_avlbl = socket_client_audio.connect(ip, port_audio, username, 
-                self.speaker_dict, self.mic_dict, self.input_device_id, self.output_device_id, 
+                self.mic_dict, self.speaker_dict, self.input_device_id, self.output_device_id, 
                 self.show_error)
         if self.is_self_audio_avlbl == -1:
             #this means client was not able to connect to server, we will not be able to use video chat at all
