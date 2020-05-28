@@ -472,8 +472,8 @@ class vConnectApp():
         if(self.is_test_audio_clicked == False):
             try:
                 self.audioin = sd.RawInputStream(samplerate=int(self.mic_dict['default_samplerate']), 
-                    blocksize=2048, device=self.input_device_id, 
-                    channels=self.mic_dict['max_input_channels'],  
+                    blocksize=socket_client_audio.READ_SIZE, device=self.input_device_id, 
+                    #channels=self.mic_dict['max_input_channels'],  
                     dtype=np.float32, latency=self.mic_dict['default_low_input_latency'] )
                 audioin_flag = True
             except Exception as e:
@@ -481,8 +481,8 @@ class vConnectApp():
                 audioin_flag = False
             try:    
                 self.audioout = sd.RawOutputStream(samplerate=int(self.speaker_dict['default_samplerate']), 
-                    blocksize=2048, device=self.output_device_id, 
-                    channels=self.speaker_dict['max_output_channels'],  
+                    blocksize=socket_client_audio.READ_SIZE, device=self.output_device_id, 
+                    #channels=self.speaker_dict['max_output_channels'],  
                     dtype=np.float32, latency=self.mic_dict['default_low_output_latency'] )
                 audioout_flag = True
             except Exception as e:
