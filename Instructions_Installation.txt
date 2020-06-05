@@ -2,7 +2,7 @@
 Step 1] Download python
 	- Go to https://www.python.org/
 	- Go to downloads section - https://www.python.org/downloads/
-	- If your machine is on Windows, download the latest version of Python
+	- download the latest version of Python (ideally 3.8.x)
 
 Step 2] Install Python
 	- Go to the folder where you donloaded Python
@@ -57,17 +57,20 @@ Step 2] "Configure Devides" Tab
 		- If you do not hear any sound then you may need to configure your microphone and speaker
 
 Step 3] "Connect" Tab
-	- Change the "User Name" to Deepak
-	- Keep all other fields AS IS
+	- Change the "User Name" to - your name
+	- Enter IP given to you
+	- Keep all other fields AS IS 
 	- Click "Join" Button to connect to vconnect server
 	- Once connected "Chat" tab will open
 
 Step 4] "Chat" tab
 	- If you are here that means you have successfully connected to vconnect's "Text" chat gateway
-	- You can continue to chat using text
+	- You can continue to chat using text by typing and then hitting 'enter' or clicking 'Send'
 
 	- Click "Start Video" to start video communication. This connects your application to vconnect's "Video" communication gateway
 	- Click "Start Audio" to start audio communication. This connects your application to vconnect's "Audio" communication gateway
 
 	- Once done click "Stop Video" and "Stop Audio" to close the connection to "Video" and "Audio" gateway respectively
+	
+	- Click "Close App" anytime to close the application
 

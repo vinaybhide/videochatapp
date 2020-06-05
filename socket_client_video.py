@@ -13,7 +13,8 @@ HEADER_LENGTH = 10
 NP_ROW_CHARS_SIZE = 4
 NP_COL_CHARS_SIZE = 4
 NP_DIM_CHARS_SIZE = 4
-client_socket_video = None
+client_socket_video_send = None
+client_socket_video_recv = None
 #vsock = None
 thread_send_video = None
 thread_listen_video = None
@@ -30,7 +31,8 @@ window_list = []
 
 # Connects to the server
 def connect(ip, port, my_username, error_callback):
-    global client_socket_video
+    global client_socket_video_send
+    global client_socket_video_recv
     #global vsock
     global videofeed
     global self_username
@@ -42,11 +44,11 @@ def connect(ip, port, my_username, error_callback):
     # socket.SOCK_STREAM - TCP, conection-based, socket.SOCK_DGRAM - UDP, connectionless, datagrams, socket.SOCK_RAW - raw IP packets
     stop_connection = False
     try:
-        client_socket_video = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket_video_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Connect to a given ip and port
-        client_socket_video.connect((ip, port))
-        #vsock = videosocket.videosocket (client_socket_video)
+        client_socket_video_send.connect((ip, port))
+        #vsock = videosocket.videosocket (client_socket_video_send)
     except Exception as e:
         # Connection error
         #error_callback('Connection error: {}'.format(str(e)), False)
@@ -58,18 +60,50 @@ def connect(ip, port, my_username, error_callback):
     try:
         self_username = my_username
         username = my_username.encode('utf-8')
-        username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
-        #print('before client_socket_video.send(username_header + username)')
-        ret = client_socket_video.send(username_header + username)
+        keyword = 'SEND_SOCKET'.encode('utf-8')
+        sep_bytes = ':'.encode('utf-8')
+        username_header = f"{len(keyword+sep_bytes+username):<{HEADER_LENGTH}}".encode('utf-8')
+        #print('before client_socket_video_send.send(username_header + username)')
+        ret = client_socket_video_send.send(username_header + keyword+sep_bytes+username)
         if(ret <= 0):
             close_connection()
             return -2
-        #print('after client_socket_video.send(username_header + username)')
+        #print('after client_socket_video_send.send(username_header + username)')
     except Exception as e:
         # Connection error
         #error_callback('Connection error: {}'.format(str(e)), False)
         close_connection()
         return -2
+
+    try:
+        client_socket_video_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Connect to a given ip and port
+        client_socket_video_recv.connect((ip, port))
+        #vsock = videosocket.videosocket (client_socket_video_send)
+    except Exception as e:
+        # Connection error
+        #error_callback('Connection error: {}'.format(str(e)), False)
+        close_connection()
+        return -1
+
+    # Prepare username and header and send them
+    # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
+    try:
+        keyword = 'READ_SOCKET'.encode('utf-8')
+        username_header = f"{len(keyword+sep_bytes+username):<{HEADER_LENGTH}}".encode('utf-8')
+        #print('before client_socket_video_send.send(username_header + username)')
+        ret = client_socket_video_recv.send(username_header + keyword+sep_bytes+username)
+        if(ret <= 0):
+            close_connection()
+            return -2
+        #print('after client_socket_video_send.send(username_header + username)')
+    except Exception as e:
+        # Connection error
+        #error_callback('Connection error: {}'.format(str(e)), False)
+        close_connection()
+        return -2
+
 
     try:
         videofeed = VideoFeed(1,my_username,1)
@@ -97,12 +131,11 @@ def send(message, header_size=HEADER_LENGTH):
     send_size = len(to_send)
     tot_sent = 0
     while tot_sent < send_size:
-        ret = client_socket_video.send(to_send[tot_sent:send_size])
+        ret = client_socket_video_send.send(to_send[tot_sent:send_size])
         tot_sent += ret
-    #client_socket_video.send(message_header + message)
+    #client_socket_video_send.send(message_header + message)
 
-def receive_message(client_socket, receive_size=HEADER_LENGTH):
-
+def receive_message(receive_size=HEADER_LENGTH):
     try:
         # Receive our "header" containing message length, it's size is defined and constant
         #message_header = client_socket.recv(receive_size)
@@ -110,7 +143,7 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         message_header = ''.encode('utf-8')
         totrec = 0
         while totrec<receive_size :
-            chunk = client_socket.recv(receive_size - totrec)
+            chunk = client_socket_video_recv.recv(receive_size - totrec)
             #if chunk == '':
             if chunk is False:
                 print("In receive_message: received 0 bytes during receive of data size.")
@@ -131,7 +164,7 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         message_data = ''.encode('utf-8')
         totrec = 0
         while totrec<message_length :
-            chunk = client_socket.recv(message_length - totrec)
+            chunk = client_socket_video_recv.recv(message_length - totrec)
             #if chunk == '':
             if chunk is False:
                 print("In receive_message: received 0 bytes during receive of data.")
@@ -158,15 +191,21 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
 
 
 def close_connection():
-    global client_socket_video
+    global client_socket_video_send
+    global client_socket_video_recv
     global videofeed
 
     stop_video_comm()    
-    if( client_socket_video != None ):
-        client_socket_video.close()
-    
+
+    if( client_socket_video_send != None ):
+        client_socket_video_send.close()
+
+    if( client_socket_video_recv != None ):
+        client_socket_video_recv.close()
+
     #videofeed = None
-    client_socket_video = None
+    client_socket_video_send = None
+    client_socket_video_recv = None
 
 def stop_video_comm():
     global stop_connection
@@ -187,7 +226,7 @@ def stop_video_comm():
         cv2.destroyWindow(self_username)
 
     #send CLOSING
-    if( client_socket_video != None ):
+    if( client_socket_video_send != None ):
         send('CLOSING')
 
     try:
@@ -218,58 +257,60 @@ def send_video(send_callback, error_callback):
             send('DATA')
             #ret = cv2.getWindowProperty(self_username, cv2.WND_PROP_VISIBLE)
             #if(ret > 0):
-            x = cv2.waitKey(1)
+            """x = cv2.waitKey(1)
             if(x == 27):
                 cv2.destroyAllWindows()
-                break
+                break"""
 
             frame=videofeed.get_frame()
             #get_frame returns np.ndarray, change the np.ndarray to bytes and then send bytes
             #we also need to send the shape of nparray so that it can be reconstructed in reveice
 
-            #if(client_socket_video != None):
+            #if(client_socket_video_send != None):
             """shape_row_bytes = (str(frame.shape[0])).encode('utf-8')
             message_header = f"{len(shape_row_bytes):<{NP_ROW_CHARS_SIZE}}".encode('utf-8')
-            client_socket_video.send(message_header + shape_row_bytes)
+            client_socket_video_send.send(message_header + shape_row_bytes)
 
             shape_col_bytes = (str(frame.shape[1])).encode('utf-8')
             message_header = f"{len(shape_col_bytes):<{NP_COL_CHARS_SIZE}}".encode('utf-8')
-            client_socket_video.send(message_header + shape_col_bytes)
+            client_socket_video_send.send(message_header + shape_col_bytes)
 
             shape_dim_bytes = (str(frame.shape[2])).encode('utf-8')
             message_header = f"{len(shape_dim_bytes):<{NP_DIM_CHARS_SIZE}}".encode('utf-8')
-            client_socket_video.send(message_header + shape_dim_bytes)"""
+            client_socket_video_send.send(message_header + shape_dim_bytes)"""
 
-            shape_str = f"{frame.shape[0]},{frame.shape[1]},{frame.shape[2]}"
-            send(shape_str, HEADER_LENGTH)
+            """shape_str = f"{frame.shape[0]},{frame.shape[1]},{frame.shape[2]}"
+            send(shape_str, HEADER_LENGTH)"""
+            
             #shape_str_bytes = shape_str.encode('utf-8')
             #message_header = f"{len(shape_str_bytes):<{HEADER_LENGTH}}".encode('utf-8')
-            #client_socket_video.send(message_header + shape_str_bytes)
+            #client_socket_video_send.send(message_header + shape_str_bytes)
 
             #now send the entire nparray as bytes
             send_bytes = frame.tobytes()
             #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
 
             #compress the video bytes - 9 is max compression amd 1 is lowest compression
-            compressed_send_bytes = zlib.compress(send_bytes, 9)
+            #compressed_send_bytes = zlib.compress(send_bytes, 9)
+            compressed_send_bytes = zlib.compress(send_bytes, -1)
             
             #send_size = len(send_bytes)
             send_size = len(compressed_send_bytes)
+            #send(str(send_size))
 
-            send(str(send_size))
+            frame_size = f"{frame.shape[0]},{frame.shape[1]},{frame.shape[2]},{send_size}"
+            send(frame_size)
             totalsent = 0
             while totalsent < send_size :
-                #sent = client_socket_video.send(send_bytes)
-                sent = client_socket_video.send(compressed_send_bytes)
+                #sent = client_socket_video_send.send(send_bytes)
+                sent = client_socket_video_send.send(compressed_send_bytes)
                 if sent == 0:
-                    print("client_socket_video.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
+                    print("client_socket_video_send.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
                     #raise RuntimeError("Socket connection broken")
                     break #this means we will exit the thread and sending will stop
                 totalsent += sent
 
 
-            #vsock.vsend(send_bytes, (frame.shape[0] * frame.shape[1] * frame.shape[2]))
-            #vsock.vsend(frame)
             videofeed.set_frame(frame)
             if(stop_connection == True):
                 #print('before pill_to_kill_send_thread.set()')
@@ -285,7 +326,7 @@ def send_video(send_callback, error_callback):
             #cv2.destroyWindow(self_username)
             #vsock = None
             #videofeed = None
-            #client_socket_video.close()
+            #client_socket_video_send.close()
             #error_callback('Reading error: {}'.format(str(e)), False)
             #break
 
@@ -328,7 +369,7 @@ def listen(listen_callback, error_callback):
             #if((vsock != None) and (videofeed != None)):
             #first get the username
             # Receive our "header" containing username length, it's size is defined and constant
-            """username_header = client_socket_video.recv(HEADER_LENGTH)
+            """username_header = client_socket_video_send.recv(HEADER_LENGTH)
 
             # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
             if not len(username_header):
@@ -341,27 +382,27 @@ def listen(listen_callback, error_callback):
             #print('after username_length: ' + str(username_length))
 
             # Receive and decode username
-            username = client_socket_video.recv(username_length).decode('utf-8')
-            #print('client_socket_video.recv: username= ' + username)"""
+            username = client_socket_video_send.recv(username_length).decode('utf-8')
+            #print('client_socket_video_send.recv: username= ' + username)"""
 
-            username_dict = receive_message(client_socket_video, HEADER_LENGTH)
+            username_dict = receive_message()
             if(username_dict is False):
                 print('username_dict is False. continuing...')
                 continue
 
             username = (username_dict['data'].decode('utf-8')).strip()
 
-            """keyword_header = client_socket_video.recv(HEADER_LENGTH)
+            """keyword_header = client_socket_video_send.recv(HEADER_LENGTH)
             if not len(keyword_header):
                 #error_callback('Connection closed by the server', False)
-                print('Connection closed by server in keyword_header = client_socket_video.recv(HEADER_LENGTH)')
+                print('Connection closed by server in keyword_header = client_socket_video_send.recv(HEADER_LENGTH)')
                 continue
 
             # Convert header to int value
             keyword_length = int(keyword_header.decode('utf-8').strip())
-            keyworkd_message = client_socket_video.recv(keyword_length).decode('utf-8')"""
+            keyworkd_message = client_socket_video_send.recv(keyword_length).decode('utf-8')"""
 
-            keyword_dict = receive_message(client_socket_video, HEADER_LENGTH)
+            keyword_dict = receive_message()
             if(keyword_dict is False):
                 print('keyword_dict is False. continuing...')
                 continue
@@ -382,13 +423,13 @@ def listen(listen_callback, error_callback):
                 break
             elif(keyworkd_message.upper() == 'DATA'):
                 #now get the share of nparray. shape is (row, cols, dim) ex. shape: (480, 640, 3)
-                #print('before client_socket_video.recv to get row')
-                """shape_size_header = client_socket_video.recv(HEADER_LENGTH)
+                #print('before client_socket_video_send.recv to get row')
+                """shape_size_header = client_socket_video_send.recv(HEADER_LENGTH)
                 shape_size_length = int(shape_size_header.decode('utf-8').strip())
 
-                shape_size_str = client_socket_video.recv(shape_size_length).decode('utf-8')"""
+                shape_size_str = client_socket_video_send.recv(shape_size_length).decode('utf-8')"""
 
-                shape_dict = receive_message(client_socket_video, HEADER_LENGTH)
+                shape_dict = receive_message()
                 if(shape_dict is False):
                     print('shape_dict is False. continuing...')
                     continue
@@ -399,40 +440,42 @@ def listen(listen_callback, error_callback):
                 shape_row_int = int(shape_size_split[0])
                 shape_col_int = int(shape_size_split[1])
                 shape_dim_int = int(shape_size_split[2])
-                """shape_row_header = client_socket_video.recv(NP_ROW_CHARS_SIZE)
+                message_size = int(shape_size_split[3])
+
+                """shape_row_header = client_socket_video_send.recv(NP_ROW_CHARS_SIZE)
                 shape_row_length = int(shape_row_header.decode('utf-8').strip())
-                shape_row_int = int(client_socket_video.recv(shape_row_length).decode('utf-8'))
+                shape_row_int = int(client_socket_video_send.recv(shape_row_length).decode('utf-8'))
 
-                #print('before client_socket_video.recv to get col')
-                shape_col_header = client_socket_video.recv(NP_COL_CHARS_SIZE)
+                #print('before client_socket_video_send.recv to get col')
+                shape_col_header = client_socket_video_send.recv(NP_COL_CHARS_SIZE)
                 shape_col_length = int(shape_col_header.decode('utf-8').strip())
-                shape_col_int = int(client_socket_video.recv(shape_col_length).decode('utf-8'))
+                shape_col_int = int(client_socket_video_send.recv(shape_col_length).decode('utf-8'))
 
-                #print('before client_socket_video.recv to get dim')
-                shape_dim_header = client_socket_video.recv(NP_DIM_CHARS_SIZE)
+                #print('before client_socket_video_send.recv to get dim')
+                shape_dim_header = client_socket_video_send.recv(NP_DIM_CHARS_SIZE)
                 shape_dim_length = int(shape_dim_header.decode('utf-8').strip())
-                shape_dim_int = int(client_socket_video.recv(shape_dim_length).decode('utf-8'))
-                #print('after client_socket_video.recv to get dim')"""
+                shape_dim_int = int(client_socket_video_send.recv(shape_dim_length).decode('utf-8'))
+                #print('after client_socket_video_send.recv to get dim')"""
 
                 #get the size of the bytes array
-                """message_size_header = client_socket_video.recv(HEADER_LENGTH)
+                """message_size_header = client_socket_video_send.recv(HEADER_LENGTH)
                 message_size_length = int(message_size_header.decode('utf-8').strip())
-                message_size = int(client_socket_video.recv(message_size_length).decode('utf-8'))"""
+                message_size = int(client_socket_video_send.recv(message_size_length).decode('utf-8'))"""
 
-                message_size_dict = receive_message(client_socket_video, HEADER_LENGTH)
+                """message_size_dict = receive_message(client_socket_video_send, HEADER_LENGTH)
                 if(message_size_dict is False):
                     print('message_size_dict is False. continuing...')
                     continue
 
-                message_size = int((message_size_dict['data'].decode('utf-8')).strip())
+                message_size = int((message_size_dict['data'].decode('utf-8')).strip())"""
 
                 totrec = 0
                 frame = ''.encode('utf-8')
                 #message_size = shape_row_int*shape_col_int*shape_dim_int
                 while totrec<message_size :
-                    chunk = client_socket_video.recv(message_size - totrec)
+                    chunk = client_socket_video_recv.recv(message_size - totrec)
                     if chunk == '':
-                        print("client_socket_video.recv(message_size - totrec): During receiving frame socket connection broken, Breaking the current receive operation")
+                        print("client_socket_video_send.recv(message_size - totrec): During receiving frame socket connection broken, Breaking the current receive operation")
                         #raise RuntimeError("Socket connection broken")
                         break
                     totrec += len(chunk)
@@ -480,7 +523,7 @@ def listen(listen_callback, error_callback):
             #cv2.destroyWindow(self_username)
             #vsock = None
             #videofeed = None
-            #client_socket_video.close()
+            #client_socket_video_send.close()
             #error_callback('Reading error: {}'.format(str(e)), False)
             #break
     #since we are out of while, that means a 'CLOSING' message was received by a 

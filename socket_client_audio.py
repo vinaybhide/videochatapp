@@ -13,7 +13,8 @@ HEADER_LENGTH = 10
 NP_ROW_CHARS_SIZE = 10
 NP_COL_CHARS_SIZE = 4
 READ_SIZE = 4096
-client_socket_audio = None
+client_socket_audio_send = None
+client_socket_audio_recv = None
 audio_in = None
 audio_out = None
 self_username = ''
@@ -25,7 +26,8 @@ stop_connection = False
 
 # Connects to the server
 def connect(ip, port, my_username, input_device_dict, output_device_dict, input_device_id, output_device_id, error_callback):
-    global client_socket_audio
+    global client_socket_audio_send
+    global client_socket_audio_recv
     global self_username
     global audio_in
     global audio_out
@@ -37,9 +39,9 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
     # socket.SOCK_STREAM - TCP, conection-based, socket.SOCK_DGRAM - UDP, connectionless, datagrams, socket.SOCK_RAW - raw IP packets
     stop_connection = False
     try:
-        client_socket_audio = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket_audio_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Connect to a given ip and port
-        client_socket_audio.connect((ip, port))
+        client_socket_audio_send.connect((ip, port))
     except Exception as e:
         # Connection error
         #error_callback('Connection error: {}'.format(str(e)), False)
@@ -51,10 +53,33 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
         # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
         self_username = my_username
         username = my_username.encode('utf-8')
-        username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
-        #print('before client_socket_video.send(username_header + username)')
-        ret = client_socket_audio.send(username_header + username)
-        #print('after client_socket_video.send(username_header + username)')
+        keyword = 'SEND_SOCKET'.encode('utf-8')
+        sep_bytes = ':'.encode('utf-8')
+        username_header = f"{len(keyword+sep_bytes+username):<{HEADER_LENGTH}}".encode('utf-8')
+        ret = client_socket_audio_send.send(username_header + keyword+sep_bytes+username)
+        if(ret <= 0):
+            close_connection()
+            return -2
+    except Exception as e:
+        close_connection()
+        return -2
+
+    try:
+        client_socket_audio_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Connect to a given ip and port
+        client_socket_audio_recv.connect((ip, port))
+    except Exception as e:
+        # Connection error
+        #error_callback('Connection error: {}'.format(str(e)), False)
+        close_connection()
+        return -1
+
+    try:
+        # Prepare username and header and send them
+        # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
+        keyword = 'READ_SOCKET'.encode('utf-8')
+        username_header = f"{len(keyword+sep_bytes+username):<{HEADER_LENGTH}}".encode('utf-8')
+        ret = client_socket_audio_recv.send(username_header + keyword+sep_bytes+username)
         if(ret <= 0):
             close_connection()
             return -2
@@ -100,10 +125,19 @@ def send(message, header_size=HEADER_LENGTH):
     send_size = len(to_send)
     tot_sent = 0
     while tot_sent < send_size:
-        ret = client_socket_audio.send(to_send[tot_sent:send_size])
+        ret = client_socket_audio_send.send(to_send[tot_sent:send_size])
         tot_sent += ret
 
-def receive_message(client_socket, receive_size=HEADER_LENGTH):
+def send_bytes(bytes_to_send, header_size=HEADER_LENGTH):
+    message_header = f"{len(bytes_to_send):<{header_size}}".encode('utf-8')
+    to_send = message_header + bytes_to_send
+    send_size = len(to_send)
+    tot_sent = 0
+    while tot_sent < send_size:
+        ret = client_socket_audio_send.send(to_send[tot_sent:send_size])
+        tot_sent += ret
+
+def receive_message(receive_size=HEADER_LENGTH):
 
     try:
         # Receive our "header" containing message length, it's size is defined and constant
@@ -112,7 +146,7 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         message_header = ''.encode('utf-8')
         totrec = 0
         while totrec<receive_size :
-            chunk = client_socket.recv(receive_size - totrec)
+            chunk = client_socket_audio_recv.recv(receive_size - totrec)
             #if chunk == '':
             if chunk is False:
                 print("In receive_message: received 0 bytes during receive of data size.")
@@ -133,7 +167,7 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         message_data = ''.encode('utf-8')
         totrec = 0
         while totrec<message_length :
-            chunk = client_socket.recv(message_length - totrec)
+            chunk = client_socket_audio_recv.recv(message_length - totrec)
             #if chunk == '':
             if chunk is False:
                 print("In receive_message: received 0 bytes during receive of data.")
@@ -158,21 +192,18 @@ def receive_message(client_socket, receive_size=HEADER_LENGTH):
         # and that's also a cause when we receive an empty message
         return False
 
-def set_input_device_options():
-    return
-
-def set_output_device_options():
-    return
-
 def close_connection():
-    global client_socket_audio
+    global client_socket_audio_send
+    global client_socket_audio_recv
     stop_audio_comm()    
-    if( client_socket_audio != None ):
-        client_socket_audio.close()
-    client_socket_audio = None
+    if( client_socket_audio_send != None ):
+        client_socket_audio_send.close()
+    if( client_socket_audio_recv != None ):
+        client_socket_audio_recv.close()
 
-    #sd.InputStream().close()
-    #sd.OutputStream().close()
+    client_socket_audio_send = None
+    client_socket_audio_recv = None
+
 
 def stop_audio_comm():
     global stop_connection
@@ -190,7 +221,7 @@ def stop_audio_comm():
         audio_in.close()
 
     #send CLOSING
-    if( client_socket_audio != None ):
+    if( client_socket_audio_send != None ):
         send('CLOSING')
 
     try:
@@ -219,32 +250,29 @@ def send_audio(send_callback, error_callback):
 
             frame, ret = audio_in.read(READ_SIZE)
             
-            send_bytes = frame[:]
+            frame_bytes = frame[:]
             """shape_str = f"{frame.shape[0]},{frame.shape[1]}"
             send(shape_str, HEADER_LENGTH)
 
             #now send the entire nparray as bytes
             send_bytes = frame.tobytes()"""
     
-            compressed_send_bytes = zlib.compress(send_bytes, 9)
-            
+            compressed_frame_bytes = zlib.compress(frame_bytes, -1)
+            send_bytes(compressed_frame_bytes, HEADER_LENGTH)
             #send_size = len(send_bytes)
-            send_size = len(compressed_send_bytes)
+            """send_size = len(compressed_send_bytes)
 
             send(str(send_size))
             
-            """compressed_send_bytes = zlib.compress(frame, 9)
-            send_size = len(compressed_send_bytes)
-            send(str(send_size))"""
             totalsent = 0
             while totalsent < send_size :
-                #sent = client_socket_audio.send(send_bytes)
-                sent = client_socket_audio.send(compressed_send_bytes)
+                #sent = client_socket_audio_send.send(send_bytes)
+                sent = client_socket_audio_send.send(compressed_send_bytes)
                 if sent == 0:
-                    print("client_socket_audio.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
+                    print("client_socket_audio_send.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
                     #raise RuntimeError("Socket connection broken")
                     break #this means we will exit the current send and sending will stop to server
-                totalsent += sent
+                totalsent += sent"""
             if(stop_connection == True):
                 #print('before pill_to_kill_send_thread.set()')
                 pill_to_kill_send_thread.set()
@@ -284,14 +312,14 @@ def listen(listen_callback, error_callback):
     #while True:
     while not pill_to_kill_listen_thread.wait(0):
         try:
-            username_dict = receive_message(client_socket_audio, HEADER_LENGTH)
+            username_dict = receive_message()
             if(username_dict is False):
                 print('username_dict is False. continuing...')
                 continue
 
             username = (username_dict['data'].decode('utf-8')).strip()
 
-            keyword_dict = receive_message(client_socket_audio, HEADER_LENGTH)
+            keyword_dict = receive_message()
             if(keyword_dict is False):
                 print('keyword_dict is False. continuing...')
                 continue
@@ -306,9 +334,9 @@ def listen(listen_callback, error_callback):
                 break                
             elif(keyworkd_message.upper() == 'DATA'):
                 #now get the share of nparray. shape is (row, cols, dim) ex. shape: (480, 640, 3)
-                #print('before :client_socket_audio.recv(NP_ROW_CHARS_SIZE)')
+                #print('before :client_socket_audio_send.recv(NP_ROW_CHARS_SIZE)')
 
-                """shape_dict = receive_message(client_socket_audio, HEADER_LENGTH)
+                """shape_dict = receive_message(client_socket_audio_send, HEADER_LENGTH)
                 if(shape_dict is False):
                     print('shape_dict is False. continuing...')
                     continue
@@ -322,7 +350,7 @@ def listen(listen_callback, error_callback):
 
                 #get the size of the bytes array
 
-                message_size_dict = receive_message(client_socket_audio, HEADER_LENGTH)
+                """message_size_dict = receive_message(client_socket_audio_send, HEADER_LENGTH)
                 if(message_size_dict is False):
                     print('message_size_dict is False. continuing...')
                     continue
@@ -333,15 +361,20 @@ def listen(listen_callback, error_callback):
                 frame = ''.encode('utf-8')
                 #message_size = shape_row_int*shape_col_int
                 while totrec<message_size :
-                    chunk = client_socket_audio.recv(message_size - totrec)
+                    chunk = client_socket_audio_send.recv(message_size - totrec)
                     if chunk is False:
-                        print("client_socket_audio.recv(message_size - totrec): During receiving frame socket connection broken, Breaking the current receive operation")
+                        print("client_socket_audio_send.recv(message_size - totrec): During receiving frame socket connection broken, Breaking the current receive operation")
                         #raise RuntimeError("Socket connection broken")
                         break
                     totrec += len(chunk)
-                    frame = frame + chunk
-
-                #print('after frame = client_socket_audio.recv')
+                    frame = frame + chunk"""
+                
+                message_dict = receive_message()
+                if(message_dict is False):
+                    print('message_dict is False. continuing...')
+                    continue
+                frame = message_dict['data']
+                #print('after frame = client_socket_audio_send.recv')
 
                 # we received bytes which we need to convert to np.ndarray
                 """ sample to convert nparray to bytes and bytes to nparray
