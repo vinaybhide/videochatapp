@@ -1,13 +1,13 @@
 #v0.8
 #import socket, videosocket
 import socket
-import errno
 from threading import Thread, Event
 #from videofeed import VideoFeed
 import sounddevice as sd
-#import logging
+import logging
 import numpy as np
 import zlib
+import time
 
 HEADER_LENGTH = 10
 NP_ROW_CHARS_SIZE = 10
@@ -23,6 +23,7 @@ thread_listen_audio = None
 pill_to_kill_send_thread = None
 pill_to_kill_listen_thread = None
 stop_connection = False
+logger = None
 
 # Connects to the server
 def connect(ip, port, my_username, input_device_dict, output_device_dict, input_device_id, output_device_id, error_callback):
@@ -34,9 +35,18 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
     global pill_to_kill_send_thread
     global pill_to_kill_listen_thread
     global stop_connection
+    #global logger
+
     # Create a socket
     # socket.AF_INET - address family, IPv4, some otehr possible are AF_INET6, AF_BLUETOOTH, AF_UNIX
     # socket.SOCK_STREAM - TCP, conection-based, socket.SOCK_DGRAM - UDP, connectionless, datagrams, socket.SOCK_RAW - raw IP packets
+    """logging.basicConfig(filename=my_username+"_audio_client.log", 
+                    format='%(asctime)s %(message)s',
+                    filemode='a') 
+
+    logger=logging.getLogger()
+    logger.setLevel(logging.DEBUG) """
+
     stop_connection = False
     try:
         client_socket_audio_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -88,23 +98,36 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
         return -2
 
     #audio_in = sd.InputStream(samplerate=44100, dtype='float32')
+    #sd.default.samplerate = 48000
+    #sd.default.latency = ['low', 'low']
+    #sd.default.dtype = ['int16', 'int16']
+    #sd.default.device = [input_device_id, output_device_id]
+
     try:
         audio_in = sd.RawInputStream(samplerate=int(input_device_dict['default_samplerate']), 
-            blocksize=READ_SIZE, device=input_device_id, 
-            #channels=input_device_dict['max_input_channels'],  
+            blocksize=READ_SIZE, 
+            #blocksize=0, 
+            device=input_device_id, 
+            channels=input_device_dict['max_input_channels'],  
             #channels=1,
-            dtype=np.float32, latency=input_device_dict['default_low_input_latency'] )
-
+            dtype=np.float32, 
+            latency=input_device_dict['default_low_input_latency'] )
+        audio_in = sd.RawInputStream()
         audio_in.start()
     except Exception as e:
         close_connection()
         return -3
     try:
         audio_out = sd.RawOutputStream(samplerate=int(output_device_dict['default_samplerate']), 
-            blocksize=READ_SIZE, device=output_device_id, 
-            #channels=output_device_dict['max_output_channels'],  
+            blocksize=READ_SIZE, 
+            #blocksize=0, 
+            device=output_device_id, 
+            channels=output_device_dict['max_output_channels'],  
             #channels=1,
-            dtype=np.float32, latency=output_device_dict['default_low_output_latency'] )
+            dtype=np.float32, 
+            #dtype=np.int24, 
+            latency=output_device_dict['default_low_output_latency'] )
+        audio_out = sd.RawOutputStream()
 
         audio_out.start()
     except Exception as e:
@@ -246,9 +269,8 @@ def send_audio(send_callback, error_callback):
     #while True:
     while not pill_to_kill_send_thread.wait(0):
         try:
-            send('DATA')
-
             frame, ret = audio_in.read(READ_SIZE)
+            #frame, ret = audio_in.read(audio_in.read_available)
             
             frame_bytes = frame[:]
             """shape_str = f"{frame.shape[0]},{frame.shape[1]}"
@@ -257,8 +279,11 @@ def send_audio(send_callback, error_callback):
             #now send the entire nparray as bytes
             send_bytes = frame.tobytes()"""
     
-            compressed_frame_bytes = zlib.compress(frame_bytes, -1)
-            send_bytes(compressed_frame_bytes, HEADER_LENGTH)
+            #compressed_frame_bytes = zlib.compress(frame_bytes, -1)
+            #send_bytes(compressed_frame_bytes, HEADER_LENGTH)
+            send('DATA')
+            send_bytes(frame_bytes)
+            #logger.info(f'after send bytes : {int(round(time.time() * 1000))}')
             #send_size = len(send_bytes)
             """send_size = len(compressed_send_bytes)
 
@@ -316,13 +341,13 @@ def listen(listen_callback, error_callback):
             if(username_dict is False):
                 print('username_dict is False. continuing...')
                 continue
-
-            username = (username_dict['data'].decode('utf-8')).strip()
-
             keyword_dict = receive_message()
             if(keyword_dict is False):
                 print('keyword_dict is False. continuing...')
                 continue
+
+            username = (username_dict['data'].decode('utf-8')).strip()
+
 
             keyworkd_message = (keyword_dict['data'].decode('utf-8')).strip()
 
@@ -388,11 +413,13 @@ def listen(listen_callback, error_callback):
                     dtype('uint8')
                 """
                 if(len(frame) > 0):
-                    frame = zlib.decompress(frame)
+                    #frame = zlib.decompress(frame)
                     """received_nparray = np.frombuffer(frame, dtype=np.float32)
                     received_nparray = received_nparray.reshape(shape_row_int, shape_col_int)
                     audio_out.write(received_nparray)"""
                     audio_out.write(frame)
+                    #logger.info(f'after audio_out.write : {int(round(time.time() * 1000))}')
+
                     #print('after : audio_out.write(received_nparray)')
         except Exception as e:
             # Any other exception - something happened, exit

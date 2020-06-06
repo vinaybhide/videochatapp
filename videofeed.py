@@ -4,15 +4,15 @@ import cv2
 #from PIL import Image
 #import Image
 
-import numpy as np
+#import numpy as np
 
 class VideoFeed:
 
     def __init__(self,mode=1,name="w1",capture=1, reduce_size=True):
         #print(name)
         self.reduce_size = reduce_size
-        if mode == 1:
-            cv2.startWindowThread() #.StartWindowThread()
+        #if mode == 1:
+        #    cv2.startWindowThread() #.StartWindowThread()
         self.camera_index = 0
         self.name=name
         if capture == 1:
@@ -25,9 +25,11 @@ class VideoFeed:
 
 
     def get_frame(self):
-        ret, self.frame =  self.capture.read() #cv2.QueryFrame(self.capture)
+        ret, frame =  self.capture.read() #cv2.QueryFrame(self.capture)
+        #frame1 = cv2.flip(frame, 1)
+
         if(self.reduce_size == True):
-            self.frame = cv2.resize(self.frame, (0,0), fx = 0.5, fy = 0.5)
+            frame1 = cv2.resize(frame, (0,0), fx = 0.5, fy = 0.5)
         """self.c = cv2.waitKey(1)
         if(self.c=="n"): #in "n" key is pressed while the popup window is in focus
             self.camera_index += 1 #try the next camera index
@@ -49,7 +51,7 @@ class VideoFeed:
         retStr=jpegImg.tobytes("jpeg","RGB")
         print(f'Compressed Size = {len(retStr)}')
         #return retStr"""
-        return self.frame
+        return frame1
 
 #jpeg.compress(self.frame,640,480,8)
 

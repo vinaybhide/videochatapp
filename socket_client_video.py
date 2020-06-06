@@ -135,6 +135,17 @@ def send(message, header_size=HEADER_LENGTH):
         tot_sent += ret
     #client_socket_video_send.send(message_header + message)
 
+def send_frame(message, frame_bytes, header_size=HEADER_LENGTH):
+    # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+    message = message.encode('utf-8')
+    message_header = f"{len(message+frame_bytes):<{header_size}}".encode('utf-8')
+    to_send = message_header + message + frame_bytes
+    send_size = len(to_send)
+    tot_sent = 0
+    while tot_sent < send_size:
+        ret = client_socket_video_send.send(to_send[tot_sent:send_size])
+        tot_sent += ret
+
 def receive_message(receive_size=HEADER_LENGTH):
     try:
         # Receive our "header" containing message length, it's size is defined and constant
@@ -254,7 +265,6 @@ def send_video(send_callback, error_callback):
     #while True:
     while not pill_to_kill_send_thread.wait(0):
         try:
-            send('DATA')
             #ret = cv2.getWindowProperty(self_username, cv2.WND_PROP_VISIBLE)
             #if(ret > 0):
             """x = cv2.waitKey(1)
@@ -290,17 +300,20 @@ def send_video(send_callback, error_callback):
             send_bytes = frame.tobytes()
             #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
 
-            #compress the video bytes - 9 is max compression amd 1 is lowest compression
+            #compress the video bytes - 9 is max compression amd 1 is lowest compression, -1 is default (6)
             #compressed_send_bytes = zlib.compress(send_bytes, 9)
-            compressed_send_bytes = zlib.compress(send_bytes, -1)
+            #compressed_send_bytes = zlib.compress(send_bytes, -1)
             
             #send_size = len(send_bytes)
-            send_size = len(compressed_send_bytes)
+            #send_size = len(compressed_send_bytes)
             #send(str(send_size))
 
-            frame_size = f"{frame.shape[0]},{frame.shape[1]},{frame.shape[2]},{send_size}"
-            send(frame_size)
-            totalsent = 0
+            #frame_size = f"{frame.shape[0]},{frame.shape[1]},{frame.shape[2]},{send_size}"
+            frame_size = f"{frame.shape[0]},{frame.shape[1]},{frame.shape[2]},"
+            #send(frame_size)
+            send('DATA')
+            send_frame(frame_size, send_bytes)
+            """totalsent = 0
             while totalsent < send_size :
                 #sent = client_socket_video_send.send(send_bytes)
                 sent = client_socket_video_send.send(compressed_send_bytes)
@@ -308,7 +321,7 @@ def send_video(send_callback, error_callback):
                     print("client_socket_video_send.send(send_bytes): During sending frame Socket connection broken. breaking the current send operation")
                     #raise RuntimeError("Socket connection broken")
                     break #this means we will exit the thread and sending will stop
-                totalsent += sent
+                totalsent += sent"""
 
 
             videofeed.set_frame(frame)
@@ -390,6 +403,11 @@ def listen(listen_callback, error_callback):
                 print('username_dict is False. continuing...')
                 continue
 
+            keyword_dict = receive_message()
+            if(keyword_dict is False):
+                print('keyword_dict is False. continuing...')
+                continue
+
             username = (username_dict['data'].decode('utf-8')).strip()
 
             """keyword_header = client_socket_video_send.recv(HEADER_LENGTH)
@@ -402,10 +420,6 @@ def listen(listen_callback, error_callback):
             keyword_length = int(keyword_header.decode('utf-8').strip())
             keyworkd_message = client_socket_video_send.recv(keyword_length).decode('utf-8')"""
 
-            keyword_dict = receive_message()
-            if(keyword_dict is False):
-                print('keyword_dict is False. continuing...')
-                continue
 
             keyworkd_message = (keyword_dict['data'].decode('utf-8')).strip()
 
@@ -434,13 +448,15 @@ def listen(listen_callback, error_callback):
                     print('shape_dict is False. continuing...')
                     continue
 
-                shape_size_str = (shape_dict['data'].decode('utf-8')).strip()
+                #shape_size_str = (shape_dict['data'].decode('utf-8')).strip()
 
-                shape_size_split = shape_size_str.split(',')
-                shape_row_int = int(shape_size_split[0])
-                shape_col_int = int(shape_size_split[1])
-                shape_dim_int = int(shape_size_split[2])
-                message_size = int(shape_size_split[3])
+                #shape_size_split = shape_size_str.split(',')
+                shape_size_split = shape_dict['data'].split(','.encode('utf-8'), 3)
+                shape_row_int = int(shape_size_split[0].decode('utf-8'))
+                shape_col_int = int(shape_size_split[1].decode('utf-8'))
+                shape_dim_int = int(shape_size_split[2].decode('utf-8'))
+                #message_size = int(shape_size_split[3])
+                frame = shape_size_split[3]
 
                 """shape_row_header = client_socket_video_send.recv(NP_ROW_CHARS_SIZE)
                 shape_row_length = int(shape_row_header.decode('utf-8').strip())
@@ -469,7 +485,7 @@ def listen(listen_callback, error_callback):
 
                 message_size = int((message_size_dict['data'].decode('utf-8')).strip())"""
 
-                totrec = 0
+                """totrec = 0
                 frame = ''.encode('utf-8')
                 #message_size = shape_row_int*shape_col_int*shape_dim_int
                 while totrec<message_size :
@@ -479,7 +495,7 @@ def listen(listen_callback, error_callback):
                         #raise RuntimeError("Socket connection broken")
                         break
                     totrec += len(chunk)
-                    frame = frame + chunk
+                    frame = frame + chunk"""
 
                 #print('after frame = vsock.vreceive()')
 
@@ -497,7 +513,7 @@ def listen(listen_callback, error_callback):
                 if(len(frame) > 0):
 
                     #decompress the recived frame
-                    frame = zlib.decompress(frame)
+                    #frame = zlib.decompress(frame)
                     
                     received_nparray = np.frombuffer(frame, dtype=np.uint8)
                     received_nparray = received_nparray.reshape(shape_row_int, shape_col_int, shape_dim_int)

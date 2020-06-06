@@ -182,6 +182,11 @@ def listen(incoming_message_callback, error_callback):
                 print('username_dict is False. continuing...')
                 continue
 
+            keyword_dict = receive_message()
+            if(keyword_dict is False):
+                print('keyword_dict is False. continuing...')
+                continue
+
             username = (username_dict['data'].decode('utf-8')).strip()
 
             """keyword_header = client_socket_text_send.recv(HEADER_LENGTH)
@@ -194,10 +199,6 @@ def listen(incoming_message_callback, error_callback):
             keyword_length = int(keyword_header.decode('utf-8').strip())
             keyworkd_message = client_socket_text_send.recv(keyword_length).decode('utf-8')"""
 
-            keyword_dict = receive_message()
-            if(keyword_dict is False):
-                print('keyword_dict is False. continuing...')
-                continue
 
             keyworkd_message = (keyword_dict['data'].decode('utf-8')).strip()
 

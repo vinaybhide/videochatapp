@@ -30,6 +30,7 @@ server_socket.listen()
 
 # List of sockets for select.select()
 sockets_list = [server_socket]
+sockets_list_removed = []
 
 # List of connected clients - socket as a key, user header and name as data
 clients = {}
@@ -114,11 +115,17 @@ def thread_listner(notified_socket):
     while True:
         keyword_dict = receive_message(notified_socket, HEADER_LENGTH)
         if( keyword_dict is False):
-            print('keyword_dict is False, continuing...')
-            continue
+            temp_user = clients[notified_socket]
+            print('keyword_dict is False, breaking connection for user={temp_user["data"]}...')
+            #sockets_list.remove(notified_socket)
+            if( notified_socket not in sockets_list_removed):
+                sockets_list_removed.append(notified_socket)
+            print('Closed connection from: {}'.format(temp_user['data'].decode('utf-8')))
+            clients[notified_socket] = None
+            break
         keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
-        to_remove_socket = None
         if(keyword_message.upper() == 'CLOSING'):
+            to_remove_socket = None
             user = clients[notified_socket]
             for client_socket in clients:
                 # But don't sent it to sender
@@ -130,11 +137,17 @@ def thread_listner(notified_socket):
                         else:
                             to_remove_socket = send_ack(client_socket, 'ACK_CLOSED')
 
-            sockets_list.remove(notified_socket)
+            #sockets_list.remove(notified_socket)
+            if( notified_socket not in sockets_list_removed):
+                sockets_list_removed.append(notified_socket)
+
             print('Closed connection from: {}'.format(user['data'].decode('utf-8')))
             clients[notified_socket] = None
             if(to_remove_socket):
-                sockets_list.remove(to_remove_socket)
+                #sockets_list.remove(to_remove_socket)
+                if( to_remove_socket not in sockets_list_removed):
+                    sockets_list_removed.append(to_remove_socket)
+
                 clients[to_remove_socket] = None
             break
         elif(keyword_message.upper() == 'DATA'):
@@ -168,6 +181,111 @@ def thread_listner(notified_socket):
                             # We are reusing here message header sent by sender, and saved username header send by user when he connected
                             #client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
                             send_message(client_socket, message['header'] + message['data'])
+
+def delete_matching_read_socket(send_socket):
+    try:
+        finditem = [key for key in clients if ((clients[key]['keyword'] == b'READ_SOCKET') and 
+                                            (clients[key]['data'] == clients[send_socket]['data']))]
+
+        for key in finditem: del clients[key]
+    except Exception as e:
+        print(f'Exception in delete_matching_read_socket: {e}')
+
+def delete_socket(notified_socket):
+    try:
+        if( notified_socket not in sockets_list_removed):
+            sockets_list_removed.append(notified_socket)
+
+        if(notified_socket in clients):
+            delete_matching_read_socket(notified_socket)
+            del clients[notified_socket]
+    except Exception as e:
+        print(f'Exception in delete_socket: {e}')
+
+def process_request(notified_socket):
+    global clients
+    global sockets_list
+
+    try:
+        keyword_dict = receive_message(notified_socket, HEADER_LENGTH)
+        if( keyword_dict is False):
+            #sockets_list.remove(notified_socket)
+            print('keyword_dict is False...Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+            delete_socket(notified_socket)
+            """if( notified_socket not in sockets_list_removed):
+                sockets_list_removed.append(notified_socket)
+            #clients[notified_socket] = None
+            delete_matching_read_socket(notified_socket)
+            del clients[notified_socket]"""
+            return -1
+        keyword_message = (keyword_dict['data'].decode('utf-8')).strip()
+        if(keyword_message.upper() == 'CLOSING'):
+            to_remove_socket = None
+            user = clients[notified_socket]
+            for client_socket in clients:
+                # But don't sent it to sender
+                if ((client_socket != notified_socket) and (clients[client_socket] != None)): 
+                    if(clients[client_socket]['keyword'] != b'SEND_SOCKET'):
+                        client_socket.send(user['header'] + user['data'])
+                        if(clients[client_socket]['data'] != clients[notified_socket]['data']):
+                            client_socket.send(keyword_dict['header'] + keyword_dict['data'])
+                        else:
+                            to_remove_socket = send_ack(client_socket, 'ACK_CLOSED')
+
+            #sockets_list.remove(notified_socket)
+
+            print('Closed connection from: {}'.format(user['data'].decode('utf-8')))
+            delete_socket(notified_socket)
+            """if( notified_socket not in sockets_list_removed):
+                sockets_list_removed.append(notified_socket)
+            #clients[notified_socket] = None
+            del clients[notified_socket]"""
+
+            if(to_remove_socket):
+                #sockets_list.remove(to_remove_socket)
+                delete_socket(to_remove_socket)
+                """if( to_remove_socket not in sockets_list_removed):
+                    sockets_list_removed.append(to_remove_socket)
+
+                #clients[to_remove_socket] = None
+                del clients[to_remove_socket]"""
+            return -1
+        elif(keyword_message.upper() == 'DATA'):
+            # Receive message
+            message = receive_message(notified_socket)
+
+            # If False, client disconnected, cleanup
+            if message is False:
+                print('message is False, going for next client socket...')
+                delete_socket(notified_socket)
+                return -2
+
+            # Get user by notified socket, so we will know who sent the message
+            user = clients[notified_socket]
+
+            if(user == None): #this case should not happen! But in case client was closed forcefully then it can
+                print("user = None, going for next client socket...")
+                delete_socket(notified_socket)
+                return -2
+
+            #print(f'Received message from {user["data"].decode("utf-8")}: {message["data"].decode("utf-8")}')
+
+            # Iterate over connected clients and broadcast message
+            for client_socket in clients:
+
+                # But don't sent it to sender
+                if ((client_socket != notified_socket) and (clients[client_socket] != None)):
+                    if(clients[client_socket]['keyword'] != b'SEND_SOCKET'):
+                        if(clients[client_socket]['data'] != clients[notified_socket]['data']):
+                            send_message(client_socket, user['header'] + user['data'])
+                            send_message(client_socket, keyword_dict['header'] + keyword_dict['data'])
+                            # Send user and message (both with their headers)
+                            # We are reusing here message header sent by sender, and saved username header send by user when he connected
+                            #client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+                            send_message(client_socket, message['header'] + message['data'])
+        return 1
+    except Exception as e:
+        print(f'Exception in process_request: {e}')
 
 while True:
 
@@ -206,14 +324,21 @@ while True:
             # Also save username and username header
             clients[client_socket] = user
 
-            if(user['keyword'] == b'SEND_SOCKET'):
-                # Add accepted socket to select.select() list
-                listner_thread = Thread(target=thread_listner, args=(client_socket,))
-                listner_thread.start()
+            """if(user['keyword'] == b'SEND_SOCKET'):
+                listner_thread = Thread(target=thread_listner, args=(client_socket,), daemon=True)
+                listner_thread.start()"""
 
             print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['data'].decode('utf-8')))
+        elif (clients[notified_socket]['keyword'] == b'SEND_SOCKET'):
+            ret = process_request(notified_socket)
 
             #we must get a message with keyword DATA or CLOSING prior to any other message
+
+    sockets_list[:] = [x for x in sockets_list if x not in sockets_list_removed]
+    sockets_list_removed.clear()
+
+    """delete_clients = [key for key in clients if(clients[key] == None)]
+    for key in delete_clients: del clients[key] """
 
     # It's not really necessary to have this, but will handle some socket exceptions just in case
     for notified_socket in exception_sockets:
