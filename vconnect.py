@@ -1,3 +1,4 @@
+#v0.9 - Alpha 1
 #v0.8
 from tkinter import *
 from tkinter import ttk
@@ -470,20 +471,35 @@ class vConnectApp():
 
     def test_audio(self):
         if(self.is_test_audio_clicked == False):
+            sd.default.samplerate = 44100
+            sd.default.latency = ['high', 'high']
+            sd.default.dtype = ['int24', 'int24']
+            sd.default.blocksize = socket_client_audio.READ_SIZE
+            sd.default.channels = [self.mic_dict['max_input_channels'], self.speaker_dict['max_output_channels']]
+            sd.default.device = [self.input_device_id, self.output_device_id]
+
             try:
-                self.audioin = sd.RawInputStream(samplerate=int(self.mic_dict['default_samplerate']), 
-                    blocksize=socket_client_audio.READ_SIZE, device=self.input_device_id, 
+                self.audioin = sd.RawInputStream(
+                    #samplerate=int(self.mic_dict['default_samplerate']), 
+                    ##blocksize=socket_client_audio.READ_SIZE, 
+                    #device=self.input_device_id, 
                     #channels=self.mic_dict['max_input_channels'],  
-                    dtype=np.float32, latency=self.mic_dict['default_low_input_latency'] )
+                    #dtype=np.float32, 
+                    #latency=self.mic_dict['default_low_input_latency'] 
+                    )
                 audioin_flag = True
             except Exception as e:
                 msgbx.showerror("Audio-in creation error", f'{e}')
                 audioin_flag = False
             try:    
-                self.audioout = sd.RawOutputStream(samplerate=int(self.speaker_dict['default_samplerate']), 
-                    blocksize=socket_client_audio.READ_SIZE, device=self.output_device_id, 
+                self.audioout = sd.RawOutputStream(
+                    #samplerate=int(self.speaker_dict['default_samplerate']), 
+                    #blocksize=socket_client_audio.READ_SIZE, 
+                    #device=self.output_device_id, 
                     #channels=self.speaker_dict['max_output_channels'],  
-                    dtype=np.float32, latency=self.mic_dict['default_low_output_latency'] )
+                    #dtype=np.float32, 
+                    #latency=self.mic_dict['default_low_output_latency'] 
+                    )
                 audioout_flag = True
             except Exception as e:
                 msgbx.showerror("Audio-out creation error", f'{e}')

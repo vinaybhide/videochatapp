@@ -1,4 +1,5 @@
-#v0.8
+#v0.9 - Alpha 1
+# #v0.8
 #import socket, videosocket
 import socket
 from threading import Thread, Event
@@ -98,36 +99,46 @@ def connect(ip, port, my_username, input_device_dict, output_device_dict, input_
         return -2
 
     #audio_in = sd.InputStream(samplerate=44100, dtype='float32')
-    #sd.default.samplerate = 48000
-    #sd.default.latency = ['low', 'low']
-    #sd.default.dtype = ['int16', 'int16']
-    #sd.default.device = [input_device_id, output_device_id]
+    sd.default.samplerate = 44100
+    sd.default.latency = ['high', 'high']
+    sd.default.dtype = ['int24', 'int24']
+    sd.default.blocksize = READ_SIZE
+    sd.default.channels = [input_device_dict['max_input_channels'], output_device_dict['max_output_channels']]
+    sd.default.device = [input_device_id, output_device_id]
 
     try:
-        audio_in = sd.RawInputStream(samplerate=int(input_device_dict['default_samplerate']), 
-            blocksize=READ_SIZE, 
+        audio_in = sd.RawInputStream(
+            #samplerate=int(input_device_dict['default_samplerate']), 
+            #samplerate=44100,
+            #blocksize=READ_SIZE, 
             #blocksize=0, 
-            device=input_device_id, 
-            channels=input_device_dict['max_input_channels'],  
+            #device=input_device_id, 
+            #channels=input_device_dict['max_input_channels'],  
             #channels=1,
-            dtype=np.float32, 
-            latency=input_device_dict['default_low_input_latency'] )
-        audio_in = sd.RawInputStream()
+            #dtype=np.float32, 
+            #dtype='float32',
+            #latency=input_device_dict['default_low_input_latency'] 
+             )
+        #audio_in = sd.RawInputStream()
         audio_in.start()
     except Exception as e:
         close_connection()
         return -3
     try:
-        audio_out = sd.RawOutputStream(samplerate=int(output_device_dict['default_samplerate']), 
-            blocksize=READ_SIZE, 
+        audio_out = sd.RawOutputStream(
+            #samplerate=int(output_device_dict['default_samplerate']), 
+            #samplerate=44100,
+            #blocksize=READ_SIZE, 
             #blocksize=0, 
-            device=output_device_id, 
-            channels=output_device_dict['max_output_channels'],  
+            #device=output_device_id, 
+            #channels=output_device_dict['max_output_channels'],  
             #channels=1,
-            dtype=np.float32, 
+            #dtype=np.float32, 
+            #dtype='float32',
             #dtype=np.int24, 
-            latency=output_device_dict['default_low_output_latency'] )
-        audio_out = sd.RawOutputStream()
+            #latency=output_device_dict['default_high_output_latency'] 
+             )
+        #audio_out = sd.RawOutputStream()
 
         audio_out.start()
     except Exception as e:
@@ -240,6 +251,8 @@ def stop_audio_comm():
     except Exception as e:
         print('stopped send thread')
 
+    print('stopped send thread')
+
     if(audio_in != None):
         audio_in.close()
 
@@ -252,6 +265,9 @@ def stop_audio_comm():
             print('waiting for listen thread to become None')
     except Exception as e:
         print('stopped listen thread')
+
+    print('stopped listen thread')
+
     if(audio_out != None):
         audio_out.close()
 
@@ -272,7 +288,7 @@ def send_audio(send_callback, error_callback):
             frame, ret = audio_in.read(READ_SIZE)
             #frame, ret = audio_in.read(audio_in.read_available)
             
-            frame_bytes = frame[:]
+            frame_bytes = zlib.compress(frame[:], -1)
             """shape_str = f"{frame.shape[0]},{frame.shape[1]}"
             send(shape_str, HEADER_LENGTH)
 
@@ -413,18 +429,18 @@ def listen(listen_callback, error_callback):
                     dtype('uint8')
                 """
                 if(len(frame) > 0):
-                    #frame = zlib.decompress(frame)
+                    frame = zlib.decompress(frame)
                     """received_nparray = np.frombuffer(frame, dtype=np.float32)
                     received_nparray = received_nparray.reshape(shape_row_int, shape_col_int)
                     audio_out.write(received_nparray)"""
-                    audio_out.write(frame)
+                    ret = audio_out.write(frame)
+
                     #logger.info(f'after audio_out.write : {int(round(time.time() * 1000))}')
 
                     #print('after : audio_out.write(received_nparray)')
         except Exception as e:
             # Any other exception - something happened, exit
             print('Falied in listen :' + str(e))
-    
     #since we are out of while, that means a 'CLOSING' message was received by a 
     pill_to_kill_listen_thread.set()
     if(pill_to_kill_send_thread != None):

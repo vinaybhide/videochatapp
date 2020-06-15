@@ -1,5 +1,7 @@
+#v0.9 - Alpha 1
 #v0.8
 import cv2
+import zlib
 
 #from PIL import Image
 #import Image
@@ -29,52 +31,13 @@ class VideoFeed:
         #frame1 = cv2.flip(frame, 1)
 
         if(self.reduce_size == True):
-            frame1 = cv2.resize(frame, (0,0), fx = 0.5, fy = 0.5)
-        """self.c = cv2.waitKey(1)
-        if(self.c=="n"): #in "n" key is pressed while the popup window is in focus
-            self.camera_index += 1 #try the next camera index
-            ret, self.capture = cv2.VideoCapture(self.camera_index) #cv2.CaptureFromCAM(self.camera_index)
-            #if not self.capture: #if the next camera index didn't work, reset to 0.
-            if ret == False:
-                self.camera_index = 0
-                self.capture = cv2.VideoCapture(self.camera_index) #cv2.VideoCapture.CaptureFromCAM(camera_index)"""
-        
-        #following code may not be required as now the frame is numpy array
-        """dimensions = self.frame.shape
-        self.height = self.frame.shape[0]
-        self.width = self.frame.shape[1]
-        channels = self.frame.shape[2]
+            frame = cv2.resize(frame, (0,0), fx = 0.5, fy = 0.5, interpolation=cv2.INTER_AREA)
 
-        #jpegImg= Image.fromstring("RGB", self.frame.size, self.frame.tostring())
-        jpegImg= Image.frombytes("RGB", (self.width, self.height), self.frame.tostring())
-        #retStr=jpegImg.tostring("jpeg","RGB")
-        retStr=jpegImg.tobytes("jpeg","RGB")
-        print(f'Compressed Size = {len(retStr)}')
-        #return retStr"""
-        return frame1
+        return frame
 
 #jpeg.compress(self.frame,640,480,8)
 
     def set_frame(self, frame):
-#im image("RGB",(640,480))
-        #jpegPIL = Image.fromstring("RGB",(640,480),frame,"jpeg","RGB","raw")
-        #jpegPIL = Image.frombytes("RGB",(640,480),frame,"jpeg","RGB","raw")
-        #jpegPIL = Image.frombytes("RGB",(self.width, self.height),frame,"jpeg","RGB","raw")
-
-        #create a blank image
-        #cv_im = cv2.CreateImage((640,480), cv2.VideoCapture.IPL_DEPTH_8U, 3)
-        #cv_im = np.zeros((640,480, 3), np.uint8)
-        #Set the string to image object
-        #cv2.VideoCapture.SetData(cv_im,jpegPIL.tostring())
-        #cv_im = jpegPIL.tostring()
-        #cv_im = jpegPIL.tobytes("jpeg","RGB")
-
-        #OpenCV all frames are in numpy array so we will have to conver this
-        #img = np.array(jpegPIL)
-        #now show
-        #cv2.VideoCapture.ShowImage(self.name, cv_im)
-        #cv2.imshow(self.name, cv_im)
-        #cv2.imshow(self.name, img)
         cv2.imshow(self.name, frame)
         x = cv2.waitKey(1)
 

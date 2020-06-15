@@ -1,3 +1,4 @@
+#v0.9 - Alpha 1
 #v0.8
 #import socket, videosocket
 import socket
@@ -273,6 +274,7 @@ def send_video(send_callback, error_callback):
                 break"""
 
             frame=videofeed.get_frame()
+            videofeed.set_frame(frame)
             #get_frame returns np.ndarray, change the np.ndarray to bytes and then send bytes
             #we also need to send the shape of nparray so that it can be reconstructed in reveice
 
@@ -298,6 +300,7 @@ def send_video(send_callback, error_callback):
 
             #now send the entire nparray as bytes
             send_bytes = frame.tobytes()
+            send_bytes = zlib.compress(send_bytes, -1)
             #send_size = (frame.shape[0] * frame.shape[1] * frame.shape[2])
 
             #compress the video bytes - 9 is max compression amd 1 is lowest compression, -1 is default (6)
@@ -513,7 +516,7 @@ def listen(listen_callback, error_callback):
                 if(len(frame) > 0):
 
                     #decompress the recived frame
-                    #frame = zlib.decompress(frame)
+                    frame = zlib.decompress(frame)
                     
                     received_nparray = np.frombuffer(frame, dtype=np.uint8)
                     received_nparray = received_nparray.reshape(shape_row_int, shape_col_int, shape_dim_int)
